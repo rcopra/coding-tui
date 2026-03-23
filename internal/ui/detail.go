@@ -1,0 +1,303 @@
+package ui
+
+import (
+	"fmt"
+
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/glamour/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/rickroll/coding-tui/internal/api"
+	"github.com/rickroll/coding-tui/internal/workspace"
+)
+
+// Messages
+type instructionsLoadedMsg struct {
+	content string
+}
+
+type hintsLoadedMsg struct {
+	content string
+}
+
+type downloadedMsg struct {
+	dir string
+}
+
+type detailErrMsg struct {
+	err error
+}
+
+// DetailScreen shows exercise instructions rendered as markdown.
+type DetailScreen struct {
+	client    *api.Client
+	workspace *workspace.Workspace
+	exercise  api.Exercise
+	trackSlug string
+
+	viewport     viewport.Model
+	instructions string
+	hints        string
+	showHints    bool
+	downloaded   bool
+	downloadDir  string
+	loading      bool
+	running      bool // test or submit in progress
+	err          error
+	statusMsg    string
+	width        int
+	height       int
+}
+
+func NewDetailScreen(client *api.Client, ws *workspace.Workspace, exercise api.Exercise, trackSlug string) *DetailScreen {
+	vp := viewport.New()
+
+	return &DetailScreen{
+		client:     client,
+		workspace:  ws,
+		exercise:   exercise,
+		trackSlug:  trackSlug,
+		viewport:   vp,
+		loading:    true,
+		downloaded: ws.IsDownloaded(trackSlug, exercise.Slug),
+	}
+}
+
+func (s *DetailScreen) Init() tea.Cmd {
+	return s.fetchInstructions
+}
+
+func (s *DetailScreen) fetchInstructions() tea.Msg {
+	content, err := s.workspace.ReadInstructions(s.trackSlug, s.exercise.Slug)
+	if err != nil {
+		return detailErrMsg{err: err}
+	}
+	return instructionsLoadedMsg{content: content}
+}
+
+func (s *DetailScreen) fetchHints() tea.Msg {
+	content, err := s.workspace.ReadHints(s.trackSlug, s.exercise.Slug)
+	if err != nil {
+		return detailErrMsg{err: err}
+	}
+	return hintsLoadedMsg{content: content}
+}
+
+func (s *DetailScreen) doDownload() tea.Msg {
+	dir, err := s.workspace.Download(s.trackSlug, s.exercise.Slug)
+	if err != nil {
+		return detailErrMsg{err: err}
+	}
+	return downloadedMsg{dir: dir}
+}
+
+func (s *DetailScreen) doRunTests() tea.Msg {
+	result, err := s.workspace.RunTests(s.trackSlug, s.exercise.Slug)
+	if err != nil {
+		return detailErrMsg{err: err}
+	}
+	return testResultMsg{passed: result.Passed, output: result.Output}
+}
+
+func (s *DetailScreen) doSubmit() tea.Msg {
+	err := s.workspace.SubmitSolution(s.trackSlug, s.exercise.Slug)
+	return submitDoneMsg{err: err}
+}
+
+func (s *DetailScreen) SetSize(width, height int) {
+	s.width = width
+	s.height = height
+	s.viewport.SetWidth(width)
+	s.viewport.SetHeight(height - 2) // leave room for status line
+}
+
+func (s *DetailScreen) renderMarkdown(md string) string {
+	width := s.width - 4
+	if width < 40 {
+		width = 40
+	}
+
+	renderer, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dark"),
+		glamour.WithWordWrap(width),
+	)
+	if err != nil {
+		return md
+	}
+
+	rendered, err := renderer.Render(md)
+	if err != nil {
+		return md
+	}
+	return rendered
+}
+
+func (s *DetailScreen) updateContent() {
+	content := s.instructions
+	if s.showHints && s.hints != "" {
+		content += "\n---\n\n## Hints\n\n" + s.hints
+	}
+	s.viewport.SetContent(s.renderMarkdown(content))
+}
+
+func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
+	switch msg := msg.(type) {
+	case instructionsLoadedMsg:
+		s.instructions = msg.content
+		s.loading = false
+		s.updateContent()
+		return s, nil
+
+	case hintsLoadedMsg:
+		s.hints = msg.content
+		if s.hints == "" {
+			s.statusMsg = "No hints available"
+		}
+		s.updateContent()
+		return s, nil
+
+	case downloadedMsg:
+		s.downloaded = true
+		s.downloadDir = msg.dir
+		s.statusMsg = fmt.Sprintf("Downloaded → %s", msg.dir)
+		return s, nil
+
+	case testResultMsg:
+		s.running = false
+		screen := NewTestRunScreen(s.exercise.Title, msg.passed, msg.output)
+		return s, pushScreen(screen)
+
+	case submitDoneMsg:
+		s.running = false
+		if msg.err != nil {
+			s.statusMsg = fmt.Sprintf("Submit failed: %v", msg.err)
+			return s, nil
+		}
+		screen := NewFeedbackScreen(
+			fmt.Sprintf("Solution submitted! View at: https://exercism.org/tracks/%s/exercises/%s", s.trackSlug, s.exercise.Slug),
+			false,
+		)
+		return s, pushScreen(screen)
+
+	case detailErrMsg:
+		s.err = msg.err
+		s.loading = false
+		s.running = false
+		return s, nil
+
+	case tea.KeyPressMsg:
+		if s.running {
+			return s, nil // ignore keys while running
+		}
+		switch msg.String() {
+		case "q", "esc":
+			return s, func() tea.Msg { return PopScreenMsg{} }
+		case "d":
+			if !s.downloaded {
+				s.statusMsg = "Downloading..."
+				return s, s.doDownload
+			}
+			s.statusMsg = fmt.Sprintf("Already downloaded: %s", s.workspace.ExerciseDir(s.trackSlug, s.exercise.Slug))
+			return s, nil
+		case "h":
+			if s.hints != "" {
+				s.showHints = !s.showHints
+				s.updateContent()
+				return s, nil
+			}
+			if !s.showHints {
+				s.showHints = true
+				return s, s.fetchHints
+			}
+		case "t":
+			if !s.downloaded {
+				s.statusMsg = "Download the exercise first (d)"
+				return s, nil
+			}
+			s.running = true
+			s.statusMsg = "Running tests..."
+			return s, s.doRunTests
+		case "s":
+			if !s.downloaded {
+				s.statusMsg = "Download the exercise first (d)"
+				return s, nil
+			}
+			s.running = true
+			s.statusMsg = "Submitting..."
+			return s, s.doSubmit
+		case "c":
+			screen := NewCommunityScreen(s.client, s.trackSlug, s.exercise.Slug)
+			return s, pushScreen(screen)
+		case "o":
+			url := fmt.Sprintf("https://exercism.org/tracks/%s/exercises/%s", s.trackSlug, s.exercise.Slug)
+			s.statusMsg = fmt.Sprintf("Open in browser: %s", url)
+			return s, openBrowser(url)
+		}
+	}
+
+	var cmd tea.Cmd
+	s.viewport, cmd = s.viewport.Update(msg)
+	return s, cmd
+}
+
+func (s *DetailScreen) View() string {
+	if s.err != nil {
+		return errStyle.Render(fmt.Sprintf("  Error: %v", s.err))
+	}
+	if s.loading {
+		return "  Loading instructions..."
+	}
+
+	status := s.buildStatusLine()
+	return s.viewport.View() + "\n" + status
+}
+
+func (s *DetailScreen) buildStatusLine() string {
+	var parts []string
+
+	if s.downloaded {
+		parts = append(parts, special.Render("✓ downloaded"))
+	}
+
+	diffStyle, ok := difficultyStyle[s.exercise.Difficulty]
+	if !ok {
+		diffStyle = subtle
+	}
+	parts = append(parts, diffStyle.Render(s.exercise.Difficulty))
+	parts = append(parts, subtle.Render(s.exercise.Type))
+
+	if s.statusMsg != "" {
+		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Render(s.statusMsg))
+	}
+
+	line := "  "
+	for i, p := range parts {
+		if i > 0 {
+			line += subtle.Render(" · ")
+		}
+		line += p
+	}
+	return line
+}
+
+func (s *DetailScreen) ShortHelp() []key.Binding {
+	bindings := []key.Binding{
+		key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "scroll")),
+	}
+	if !s.downloaded {
+		bindings = append(bindings, key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "download")))
+	} else {
+		bindings = append(bindings,
+			key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "test")),
+			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "submit")),
+		)
+	}
+	bindings = append(bindings,
+		key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "hints")),
+		key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "community")),
+		key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "browser")),
+	)
+	return bindings
+}
