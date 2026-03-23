@@ -65,6 +65,8 @@ That's it. You'll see a list of all Exercism tracks. Navigate with vim keybindin
 | `q` / `esc` | Back (quit at root) |
 | `ctrl+c` | Force quit |
 | `d` | Download exercise |
+| `e` | Open in nvim (send to next tmux pane) |
+| `E` | Open in nvim (new tmux split) |
 | `t` | Run tests locally |
 | `s` | Submit to Exercism |
 | `h` | Toggle hints |

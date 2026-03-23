@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	"charm.land/bubbles/v2/key"
@@ -39,6 +41,31 @@ func pushScreen(s Screen) tea.Cmd {
 
 func popScreen() tea.Msg {
 	return PopScreenMsg{}
+}
+
+type tmuxSentMsg struct{ err error }
+
+// tmuxSendToNvim sends `:e <filepath><CR>` to the next tmux pane,
+// telling an already-running nvim to open the file.
+func tmuxSendToNvim(filePath string) tea.Cmd {
+	return func() tea.Msg {
+		// Escape for nvim command-line: send Escape first to ensure normal mode,
+		// then :e <path><Enter>
+		keys := fmt.Sprintf("Escape :e %s Enter", filePath)
+		cmd := exec.Command("tmux", "send-keys", "-t", "{next}", keys)
+		err := cmd.Run()
+		return tmuxSentMsg{err: err}
+	}
+}
+
+// tmuxOpenNewPane opens a new tmux split with nvim pointing at the file.
+func tmuxOpenNewPane(filePath string) tea.Cmd {
+	return func() tea.Msg {
+		dir := filepath.Dir(filePath)
+		cmd := exec.Command("tmux", "split-window", "-h", "-c", dir, "nvim", filePath)
+		err := cmd.Run()
+		return tmuxSentMsg{err: err}
+	}
 }
 
 type browserOpenedMsg struct{}

@@ -181,3 +181,15 @@ func (w *Workspace) SubmitSolution(trackSlug, exerciseSlug string) error {
 
 	return w.client.SubmitSolution(meta.ID, files)
 }
+
+// SolutionFilePath returns the absolute path to the primary solution file.
+func (w *Workspace) SolutionFilePath(trackSlug, exerciseSlug string) (string, error) {
+	cfg, err := w.ReadConfig(trackSlug, exerciseSlug)
+	if err != nil {
+		return "", err
+	}
+	if len(cfg.Files.Solution) == 0 {
+		return "", fmt.Errorf("no solution files defined for %s/%s", trackSlug, exerciseSlug)
+	}
+	return filepath.Join(w.ExerciseDir(trackSlug, exerciseSlug), cfg.Files.Solution[0]), nil
+}

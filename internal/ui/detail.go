@@ -106,6 +106,24 @@ func (s *DetailScreen) doSubmit() tea.Msg {
 	return submitDoneMsg{err: err}
 }
 
+func (s *DetailScreen) openInNvim(newPane bool) tea.Cmd {
+	if !s.downloaded {
+		s.statusMsg = "Download the exercise first (d)"
+		return nil
+	}
+	filePath, err := s.workspace.SolutionFilePath(s.trackSlug, s.exercise.Slug)
+	if err != nil {
+		s.statusMsg = fmt.Sprintf("Error: %v", err)
+		return nil
+	}
+	if newPane {
+		s.statusMsg = fmt.Sprintf("Opening new pane → %s", filePath)
+		return tmuxOpenNewPane(filePath)
+	}
+	s.statusMsg = fmt.Sprintf("Sent to nvim → %s", filePath)
+	return tmuxSendToNvim(filePath)
+}
+
 func (s *DetailScreen) SetSize(width, height int) {
 	s.width = width
 	s.height = height
@@ -162,6 +180,12 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		s.downloaded = true
 		s.downloadDir = msg.dir
 		s.statusMsg = fmt.Sprintf("Downloaded → %s", msg.dir)
+		return s, nil
+
+	case tmuxSentMsg:
+		if msg.err != nil {
+			s.statusMsg = fmt.Sprintf("tmux error: %v (are you in tmux?)", msg.err)
+		}
 		return s, nil
 
 	case testResultMsg:
@@ -227,6 +251,10 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			s.running = true
 			s.statusMsg = "Submitting..."
 			return s, s.doSubmit
+		case "e":
+			return s, s.openInNvim(false)
+		case "E":
+			return s, s.openInNvim(true)
 		case "c":
 			screen := NewCommunityScreen(s.client, s.trackSlug, s.exercise.Slug)
 			return s, pushScreen(screen)
@@ -290,6 +318,8 @@ func (s *DetailScreen) ShortHelp() []key.Binding {
 		bindings = append(bindings, key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "download")))
 	} else {
 		bindings = append(bindings,
+			key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "nvim")),
+			key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "nvim (new pane)")),
 			key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "test")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "submit")),
 		)
