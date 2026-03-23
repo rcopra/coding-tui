@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rickroll/coding-tui/internal/api"
+	"github.com/rcopra/coding-tui/internal/api"
 )
 
 type Workspace struct {

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rickroll/coding-tui/internal/cache"
+	"github.com/rcopra/coding-tui/internal/cache"
 )
 
 const (

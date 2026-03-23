@@ -8,11 +8,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/rickroll/coding-tui/internal/api"
-	"github.com/rickroll/coding-tui/internal/cache"
-	"github.com/rickroll/coding-tui/internal/config"
-	"github.com/rickroll/coding-tui/internal/ui"
-	"github.com/rickroll/coding-tui/internal/workspace"
+	"github.com/rcopra/coding-tui/internal/api"
+	"github.com/rcopra/coding-tui/internal/cache"
+	"github.com/rcopra/coding-tui/internal/config"
+	"github.com/rcopra/coding-tui/internal/ui"
+	"github.com/rcopra/coding-tui/internal/workspace"
 )
 
 func main() {

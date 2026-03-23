@@ -1,4 +1,4 @@
-module github.com/rickroll/coding-tui
+module github.com/rcopra/coding-tui
 
 go 1.26.1
 
