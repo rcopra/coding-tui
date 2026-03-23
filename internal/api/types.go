@@ -51,7 +51,7 @@ type CommunitySolution struct {
 	NumLOC           int    `json:"num_loc"`
 	PublishedAt      string `json:"published_at"`
 	IsStarred        bool   `json:"is_starred"`
-	PublishedIterNum int    `json:"published_iteration_head_tests_status"`
+	PublishedIterTestsStatus string `json:"published_iteration_head_tests_status"`
 	Author           struct {
 		Handle    string `json:"handle"`
 		AvatarURL string `json:"avatar_url"`
