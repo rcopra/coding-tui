@@ -88,12 +88,8 @@ func (r Root) View() tea.View {
 
 	content := header + "\n\n" + body + "\n" + helpBar
 
-	// Force pure black background across the entire screen
-	bg := lipgloss.NewStyle().
-		Background(lipgloss.Color("#000000")).
-		Width(r.width).
-		Height(r.height)
-	content = bg.Render(content)
+	// Pad every line to full width with true black background
+	content = fillBackground(content, r.width)
 
 	v := tea.NewView(content)
 	v.AltScreen = true
