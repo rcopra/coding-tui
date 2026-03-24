@@ -23,9 +23,9 @@ type exercisesErrMsg struct {
 
 // Difficulty colors
 var difficultyStyle = map[string]lipgloss.Style{
-	"easy":   lipgloss.NewStyle().Foreground(lipgloss.Color("86")),
-	"medium": lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
-	"hard":   lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
+	"easy":   lipgloss.NewStyle().Foreground(green),
+	"medium": lipgloss.NewStyle().Foreground(yellow),
+	"hard":   lipgloss.NewStyle().Foreground(red),
 }
 
 // Exercise type indicators
@@ -88,7 +88,7 @@ func NewExercisesScreen(client *api.Client, ws *workspace.Workspace, trackSlug, 
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("86")).
+		Foreground(lavender).
 		MarginLeft(2)
 
 	// Vim-style keybindings

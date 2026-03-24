@@ -70,7 +70,7 @@ func NewCommunityScreen(client *api.Client, trackSlug, exerciseSlug string) *Com
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("212")).
+		Foreground(mauve).
 		MarginLeft(2)
 
 	l.KeyMap.CursorUp = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up"))
@@ -249,7 +249,7 @@ func (s *SolutionViewerScreen) renderFiles(files []api.CommunitySolutionFile) st
 	for _, f := range files {
 		header := lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("212")).
+			Foreground(mauve).
 			Render("  " + f.Filename)
 
 		// Wrap code in markdown fenced block for glamour to syntax highlight
@@ -259,8 +259,9 @@ func (s *SolutionViewerScreen) renderFiles(files []api.CommunitySolutionFile) st
 		if width < 40 {
 			width = 40
 		}
+		style := exercismGlamourStyle()
 		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle("dark"),
+			glamour.WithStyles(style),
 			glamour.WithWordWrap(width),
 		)
 		if err != nil {
@@ -279,7 +280,7 @@ func (s *SolutionViewerScreen) renderFiles(files []api.CommunitySolutionFile) st
 
 	author := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("86")).
+		Foreground(green).
 		Render(fmt.Sprintf("  Solution by @%s", s.handle))
 
 	return author + "\n\n" + strings.Join(sections, "\n")

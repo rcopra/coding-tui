@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
@@ -132,7 +133,7 @@ func (s *DetailScreen) SetSize(width, height int) {
 	s.width = width
 	s.height = height
 	s.viewport.SetWidth(width)
-	s.viewport.SetHeight(height - 2) // leave room for status line
+	s.viewport.SetHeight(height - 3) // title header + status line + help bar
 	// Re-render markdown if width changed and we have content
 	if oldWidth != width && s.instructions != "" {
 		s.updateContent()
@@ -140,13 +141,16 @@ func (s *DetailScreen) SetSize(width, height int) {
 }
 
 func (s *DetailScreen) renderMarkdown(md string) string {
-	width := s.width - 4
+	// Account for glamour's document margin (1 per side = 2 total)
+	glamourGutter := 2
+	width := s.width - glamourGutter
 	if width < 40 {
 		width = 40
 	}
 
+	style := exercismGlamourStyle()
 	renderer, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithStyles(style),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
@@ -286,8 +290,18 @@ func (s *DetailScreen) View() string {
 		return "  Loading instructions..."
 	}
 
+	// Title header with scroll percentage
+	title := lipgloss.NewStyle().Bold(true).Foreground(mauve).Render(s.exercise.Title)
+	scrollPct := fmt.Sprintf("%3.f%%", s.viewport.ScrollPercent()*100)
+	scrollInfo := subtle.Render(scrollPct)
+	gap := s.width - lipgloss.Width(title) - lipgloss.Width(scrollInfo) - 4
+	if gap < 0 {
+		gap = 0
+	}
+	header := "  " + title + strings.Repeat(" ", gap) + scrollInfo
+
 	status := s.buildStatusLine()
-	return s.viewport.View() + "\n" + status
+	return header + "\n" + s.viewport.View() + "\n" + status
 }
 
 func (s *DetailScreen) buildStatusLine() string {
@@ -305,7 +319,7 @@ func (s *DetailScreen) buildStatusLine() string {
 	parts = append(parts, subtle.Render(s.exercise.Type))
 
 	if s.statusMsg != "" {
-		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Render(s.statusMsg))
+		parts = append(parts, lipgloss.NewStyle().Foreground(peach).Render(s.statusMsg))
 	}
 
 	line := "  "

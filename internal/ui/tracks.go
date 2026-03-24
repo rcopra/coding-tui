@@ -30,10 +30,10 @@ func (t trackItem) Title() string {
 	title := t.track.Title
 
 	if t.track.IsJoined {
-		title += " " + lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Render("✓")
+		title += " " + lipgloss.NewStyle().Foreground(green).Render("✓")
 	}
 	if t.track.IsNew {
-		title += " " + lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Render("new")
+		title += " " + lipgloss.NewStyle().Foreground(peach).Render("new")
 	}
 	return title
 }
@@ -68,7 +68,7 @@ func NewTracksScreen(client *api.Client, ws *workspace.Workspace) *TracksScreen 
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("212")).
+		Foreground(mauve).
 		MarginLeft(2)
 
 	// Vim-style keybindings

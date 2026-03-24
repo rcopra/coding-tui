@@ -27,12 +27,12 @@ type PushScreenMsg struct {
 
 type PopScreenMsg struct{}
 
-// Styles
+// Styles — use the catppuccin/gruvbox hybrid palette from theme.go
 var (
-	subtle    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	highlight = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
-	special   = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	errStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	subtle    = lipgloss.NewStyle().Foreground(overlay)
+	highlight = lipgloss.NewStyle().Foreground(mauve)
+	special   = lipgloss.NewStyle().Foreground(green)
+	errStyle  = lipgloss.NewStyle().Foreground(red)
 )
 
 func pushScreen(s Screen) tea.Cmd {

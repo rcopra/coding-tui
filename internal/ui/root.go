@@ -80,7 +80,7 @@ func (r Root) View() tea.View {
 
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("212")).
+		Foreground(mauve).
 		Render("  exercism")
 
 	body := r.current().View()

@@ -50,12 +50,12 @@ func (s *TestRunScreen) formatOutput() string {
 	if s.passed {
 		header = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("86")).
+			Foreground(green).
 			Render("  ✓ TESTS PASSED")
 	} else {
 		header = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("196")).
+			Foreground(red).
 			Render("  ✗ TESTS FAILED")
 	}
 
@@ -125,7 +125,7 @@ func (s *FeedbackScreen) Init() tea.Cmd {
 	} else {
 		styled = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("86")).
+			Foreground(green).
 			Render("  ✓ "+s.message)
 	}
 	s.viewport.SetContent(styled)
