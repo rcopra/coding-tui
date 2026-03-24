@@ -131,7 +131,7 @@ func (s *DetailScreen) SetSize(width, height int) {
 	oldWidth := s.width
 	s.width = width
 	s.height = height
-	s.viewport.SetWidth(width)
+	s.viewport.SetWidth(width - 1) // reserve 1 col for scrollbar
 	s.viewport.SetHeight(height - 3) // title header + status line + help bar
 	// Re-render markdown if width changed and we have content
 	if oldWidth != width && s.instructions != "" {
@@ -140,8 +140,8 @@ func (s *DetailScreen) SetSize(width, height int) {
 }
 
 func (s *DetailScreen) renderMarkdown(md string) string {
-	// Account for glamour's document margin (1 per side = 2 total)
-	glamourGutter := 2
+	// Account for glamour's document margin (2 per side = 4 total) + scrollbar (1)
+	glamourGutter := 5
 	width := s.width - glamourGutter
 	if width < 40 {
 		width = 40

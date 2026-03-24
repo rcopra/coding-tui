@@ -10,132 +10,151 @@ import (
 	xansi "github.com/charmbracelet/x/ansi"
 )
 
-// Color palette: Tokyo Night inspired, matching OpenCode's aesthetic.
-// High contrast white text on true black. Reads like a document.
+// Color palette: OpenCode-inspired.
+// True black bg, bright white text, purple accent headings.
 var (
-	black  = lipgloss.Color("#000000") // true black background
-	white  = lipgloss.Color("#e8e8e8") // body text — bright, high contrast
-	dim    = lipgloss.Color("#636da6") // muted text, chrome
-	faint  = lipgloss.Color("#1a1b26") // scrollbar track
-	accent = lipgloss.Color("#7aa2f7") // bright blue — headings, primary
-	gold   = lipgloss.Color("#e0af68") // golden — section headings
-	green  = lipgloss.Color("#9ece6a") // success, easy, strings
-	yellow = lipgloss.Color("#e0af68") // medium difficulty
-	red    = lipgloss.Color("#f7768e") // errors, hard, inline code
-	peach  = lipgloss.Color("#ff9e64") // status messages, numbers
-	purple = lipgloss.Color("#bb9af7") // keywords
+	black  = lipgloss.Color("#0a0a0a") // background
+	white  = lipgloss.Color("#eeeeee") // body text
+	dim    = lipgloss.Color("#808080") // muted text
+	faint  = lipgloss.Color("#1e1e1e") // scrollbar track, surfaces
+	accent = lipgloss.Color("#9d7cd8") // purple — headings, primary
+	blue   = lipgloss.Color("#5c9cf5") // secondary, links
+	green  = lipgloss.Color("#7fd88f") // success, easy, strings
+	yellow = lipgloss.Color("#e5c07b") // medium difficulty, types
+	red    = lipgloss.Color("#e06c75") // errors, hard, inline code
+	peach  = lipgloss.Color("#f5a742") // status messages, numbers
+	purple = lipgloss.Color("#9d7cd8") // keywords
+	cyan   = lipgloss.Color("#56b6c2") // operators, info
 )
 
 func stringPtr(s string) *string { return &s }
 func uintPtr(u uint) *uint       { return &u }
 func boolPtr(b bool) *bool       { return &b }
 
-// exercismGlamourStyle returns a Tokyo Night glamour style
-// matching OpenCode's rendering aesthetic.
+// exercismGlamourStyle returns a glamour style matching OpenCode's aesthetic.
 func exercismGlamourStyle() ansi.StyleConfig {
 	s := styles.DarkStyleConfig
 
-	// Document: clean white text, tight margin
-	s.Document.StylePrimitive.Color = stringPtr("#e8e8e8")
-	s.Document.Margin = uintPtr(1)
+	// Document: bright white text, clean margin
+	s.Document.StylePrimitive.Color = stringPtr("#eeeeee")
+	s.Document.Margin = uintPtr(2)
 
-	// Headings: bright blue like OpenCode
-	s.Heading.StylePrimitive.Color = stringPtr("#7aa2f7")
+	// Headings: purple accent like OpenCode — no ## prefix markers
+	s.Heading.StylePrimitive.Color = stringPtr("#9d7cd8")
 	s.Heading.StylePrimitive.Bold = boolPtr(true)
 
-	s.H1.StylePrimitive.Color = stringPtr("#7aa2f7")
+	s.H1.StylePrimitive.Color = stringPtr("#5c9cf5")
 	s.H1.StylePrimitive.BackgroundColor = nil
 	s.H1.StylePrimitive.Bold = boolPtr(true)
-	s.H1.StylePrimitive.Prefix = " "
-	s.H1.StylePrimitive.Suffix = " "
+	s.H1.StylePrimitive.Prefix = ""
+	s.H1.StylePrimitive.Suffix = ""
 
-	s.H2.StylePrimitive.Color = stringPtr("#e0af68")
-	s.H3.StylePrimitive.Color = stringPtr("#e0af68")
-	s.H4.StylePrimitive.Color = stringPtr("#7aa2f7")
-	s.H5.StylePrimitive.Color = stringPtr("#7aa2f7")
-	s.H6.StylePrimitive.Color = stringPtr("#565f89")
+	// Remove the typewriter ## prefix markers — cleaner like OpenCode
+	s.H2.StylePrimitive.Color = stringPtr("#e5c07b")
+	s.H2.StylePrimitive.Prefix = ""
 
-	// Inline code: tokyo night red on dark surface
+	s.H3.StylePrimitive.Color = stringPtr("#e5c07b")
+	s.H3.StylePrimitive.Prefix = ""
+
+	s.H4.StylePrimitive.Color = stringPtr("#9d7cd8")
+	s.H4.StylePrimitive.Prefix = ""
+
+	s.H5.StylePrimitive.Color = stringPtr("#9d7cd8")
+	s.H5.StylePrimitive.Prefix = ""
+
+	s.H6.StylePrimitive.Color = stringPtr("#808080")
+	s.H6.StylePrimitive.Prefix = ""
+
+	// Inline code: red on dark surface
 	s.Code = ansi.StyleBlock{
 		StylePrimitive: ansi.StylePrimitive{
 			Prefix:          "\u00a0",
 			Suffix:          "\u00a0",
-			Color:           stringPtr("#f7768e"),
-			BackgroundColor: stringPtr("#1a1b26"),
+			Color:           stringPtr("#e06c75"),
+			BackgroundColor: stringPtr("#1e1e1e"),
 		},
 	}
 
-	// Code blocks: Tokyo Night syntax highlighting
+	// Code blocks: OpenCode-style syntax highlighting
 	s.CodeBlock = ansi.StyleCodeBlock{
 		StyleBlock: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
-				Color: stringPtr("#e8e8e8"),
+				Color: stringPtr("#eeeeee"),
 			},
-			Margin: uintPtr(1),
+			Margin: uintPtr(2),
 		},
 		Chroma: &ansi.Chroma{
-			Text:    ansi.StylePrimitive{Color: stringPtr("#e8e8e8")},
-			Error:   ansi.StylePrimitive{Color: stringPtr("#f7768e")},
-			Comment: ansi.StylePrimitive{Color: stringPtr("#565f89")},
-			CommentPreproc: ansi.StylePrimitive{Color: stringPtr("#ff9e64")},
-			Keyword:          ansi.StylePrimitive{Color: stringPtr("#bb9af7")},
-			KeywordReserved:  ansi.StylePrimitive{Color: stringPtr("#bb9af7")},
-			KeywordNamespace: ansi.StylePrimitive{Color: stringPtr("#bb9af7")},
-			KeywordType:      ansi.StylePrimitive{Color: stringPtr("#2ac3de")},
-			Operator:         ansi.StylePrimitive{Color: stringPtr("#89ddff")},
-			Punctuation:      ansi.StylePrimitive{Color: stringPtr("#e8e8e8")},
-			Name:             ansi.StylePrimitive{Color: stringPtr("#e8e8e8")},
-			NameBuiltin:      ansi.StylePrimitive{Color: stringPtr("#ff9e64")},
-			NameTag:          ansi.StylePrimitive{Color: stringPtr("#f7768e")},
-			NameAttribute:    ansi.StylePrimitive{Color: stringPtr("#e0af68")},
-			NameClass:        ansi.StylePrimitive{Color: stringPtr("#e0af68"), Bold: boolPtr(true)},
-			NameDecorator:    ansi.StylePrimitive{Color: stringPtr("#e0af68")},
-			NameFunction:     ansi.StylePrimitive{Color: stringPtr("#7aa2f7")},
-			NameConstant:     ansi.StylePrimitive{Color: stringPtr("#ff9e64")},
-			NameException:    ansi.StylePrimitive{Color: stringPtr("#f7768e")},
-			LiteralNumber:    ansi.StylePrimitive{Color: stringPtr("#ff9e64")},
-			LiteralString:    ansi.StylePrimitive{Color: stringPtr("#9ece6a")},
-			LiteralStringEscape: ansi.StylePrimitive{Color: stringPtr("#89ddff")},
-			GenericDeleted:   ansi.StylePrimitive{Color: stringPtr("#f7768e")},
+			Text:    ansi.StylePrimitive{Color: stringPtr("#eeeeee")},
+			Error:   ansi.StylePrimitive{Color: stringPtr("#e06c75")},
+			Comment: ansi.StylePrimitive{Color: stringPtr("#606060")},
+			CommentPreproc: ansi.StylePrimitive{Color: stringPtr("#f5a742")},
+			Keyword:          ansi.StylePrimitive{Color: stringPtr("#9d7cd8")},
+			KeywordReserved:  ansi.StylePrimitive{Color: stringPtr("#9d7cd8")},
+			KeywordNamespace: ansi.StylePrimitive{Color: stringPtr("#9d7cd8")},
+			KeywordType:      ansi.StylePrimitive{Color: stringPtr("#e5c07b")},
+			Operator:         ansi.StylePrimitive{Color: stringPtr("#56b6c2")},
+			Punctuation:      ansi.StylePrimitive{Color: stringPtr("#eeeeee")},
+			Name:             ansi.StylePrimitive{Color: stringPtr("#eeeeee")},
+			NameBuiltin:      ansi.StylePrimitive{Color: stringPtr("#f5a742")},
+			NameTag:          ansi.StylePrimitive{Color: stringPtr("#e06c75")},
+			NameAttribute:    ansi.StylePrimitive{Color: stringPtr("#e5c07b")},
+			NameClass:        ansi.StylePrimitive{Color: stringPtr("#e5c07b"), Bold: boolPtr(true)},
+			NameDecorator:    ansi.StylePrimitive{Color: stringPtr("#e5c07b")},
+			NameFunction:     ansi.StylePrimitive{Color: stringPtr("#5c9cf5")},
+			NameConstant:     ansi.StylePrimitive{Color: stringPtr("#f5a742")},
+			NameException:    ansi.StylePrimitive{Color: stringPtr("#e06c75")},
+			LiteralNumber:    ansi.StylePrimitive{Color: stringPtr("#f5a742")},
+			LiteralString:    ansi.StylePrimitive{Color: stringPtr("#7fd88f")},
+			LiteralStringEscape: ansi.StylePrimitive{Color: stringPtr("#56b6c2")},
+			GenericDeleted:   ansi.StylePrimitive{Color: stringPtr("#e06c75")},
 			GenericEmph:      ansi.StylePrimitive{Italic: boolPtr(true)},
-			GenericInserted:  ansi.StylePrimitive{Color: stringPtr("#9ece6a")},
+			GenericInserted:  ansi.StylePrimitive{Color: stringPtr("#7fd88f")},
 			GenericStrong:    ansi.StylePrimitive{Bold: boolPtr(true)},
-			GenericSubheading: ansi.StylePrimitive{Color: stringPtr("#7aa2f7")},
+			GenericSubheading: ansi.StylePrimitive{Color: stringPtr("#5c9cf5")},
 		},
 	}
 
 	// Links: blue
 	s.Link = ansi.StylePrimitive{
-		Color:     stringPtr("#7aa2f7"),
+		Color:     stringPtr("#56b6c2"),
 		Underline: boolPtr(true),
 	}
 	s.LinkText = ansi.StylePrimitive{
-		Color: stringPtr("#7aa2f7"),
+		Color: stringPtr("#56b6c2"),
 	}
 
 	// Strong/emphasis
-	s.Strong = ansi.StylePrimitive{Bold: boolPtr(true)}
+	s.Strong = ansi.StylePrimitive{
+		Bold:  boolPtr(true),
+		Color: stringPtr("#f5a742"),
+	}
 	s.Emph = ansi.StylePrimitive{Italic: boolPtr(true)}
 
-	// Horizontal rule
+	// Horizontal rule: subtle
 	s.HorizontalRule = ansi.StylePrimitive{
-		Color:  stringPtr("#e0af68"),
+		Color:  stringPtr("#484848"),
 		Format: "\n───\n",
 	}
 
-	// Block quotes
+	// Block quotes: muted with left border
 	s.BlockQuote = ansi.StyleBlock{
 		StylePrimitive: ansi.StylePrimitive{
-			Color: stringPtr("#565f89"),
+			Color: stringPtr("#e5c07b"),
 		},
 		Indent:      uintPtr(1),
 		IndentToken: stringPtr("│ "),
 	}
 
+	// List items: clean bullet
+	s.Item = ansi.StylePrimitive{
+		BlockPrefix: "• ",
+	}
+
 	return s
 }
 
-// renderScrollbar renders a thin scrollbar track alongside content.
+// renderScrollbar appends a half-block scrollbar to the right edge of content.
+// Uses ▐ for track and █/▀/▄ for sub-cell thumb precision, matching OpenCode.
 func renderScrollbar(content string, viewportHeight, totalLines, offset int) string {
 	if totalLines <= viewportHeight || viewportHeight <= 0 {
 		return content
@@ -143,18 +162,35 @@ func renderScrollbar(content string, viewportHeight, totalLines, offset int) str
 
 	lines := strings.Split(content, "\n")
 
-	thumbSize := int(math.Max(1, math.Round(float64(viewportHeight)*float64(viewportHeight)/float64(totalLines))))
-	thumbStart := int(math.Round(float64(offset) * float64(viewportHeight-thumbSize) / float64(totalLines-viewportHeight)))
+	// Calculate in 2x virtual pixel space for sub-cell precision
+	virtualHeight := viewportHeight * 2
+	virtualThumbSize := int(math.Max(2, math.Round(float64(virtualHeight)*float64(viewportHeight)/float64(totalLines))))
+	virtualThumbStart := int(math.Round(float64(offset) * float64(virtualHeight-virtualThumbSize) / float64(totalLines-viewportHeight)))
+	virtualThumbEnd := virtualThumbStart + virtualThumbSize
 
-	trackChar := lipgloss.NewStyle().Foreground(faint).Render("│")
-	thumbChar := lipgloss.NewStyle().Foreground(dim).Render("┃")
+	trackStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#1e1e1e"))
+	thumbStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#484848"))
 
 	for i := 0; i < len(lines) && i < viewportHeight; i++ {
-		char := trackChar
-		if i >= thumbStart && i < thumbStart+thumbSize {
-			char = thumbChar
+		cellTop := i * 2
+		cellBottom := cellTop + 1
+
+		topInThumb := cellTop >= virtualThumbStart && cellTop < virtualThumbEnd
+		bottomInThumb := cellBottom >= virtualThumbStart && cellBottom < virtualThumbEnd
+
+		var char string
+		switch {
+		case topInThumb && bottomInThumb:
+			char = thumbStyle.Render("█")
+		case topInThumb && !bottomInThumb:
+			char = thumbStyle.Render("▀")
+		case !topInThumb && bottomInThumb:
+			char = thumbStyle.Render("▄")
+		default:
+			char = trackStyle.Render(" ")
 		}
-		lines[i] = lines[i] + " " + char
+
+		lines[i] = lines[i] + char
 	}
 
 	return strings.Join(lines, "\n")

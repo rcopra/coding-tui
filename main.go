@@ -31,7 +31,7 @@ func main() {
 	root := ui.NewRoot(tracks)
 
 	// Set terminal background to true black while the TUI runs
-	fmt.Print("\033]11;#000000\a")
+	fmt.Print("\033]11;#0a0a0a\a")
 	defer fmt.Print("\033]111\a") // reset to terminal default on exit
 
 	p := tea.NewProgram(root)
