@@ -27,10 +27,10 @@ type PushScreenMsg struct {
 
 type PopScreenMsg struct{}
 
-// Styles — use the catppuccin/gruvbox hybrid palette from theme.go
+// Styles — high contrast, OpenCode-inspired
 var (
-	subtle    = lipgloss.NewStyle().Foreground(overlay)
-	highlight = lipgloss.NewStyle().Foreground(mauve)
+	subtle    = lipgloss.NewStyle().Foreground(dim)
+	highlight = lipgloss.NewStyle().Foreground(accent)
 	special   = lipgloss.NewStyle().Foreground(green)
 	errStyle  = lipgloss.NewStyle().Foreground(red)
 )

@@ -33,7 +33,7 @@ func (t trackItem) Title() string {
 		title += " " + lipgloss.NewStyle().Foreground(green).Render("✓")
 	}
 	if t.track.IsNew {
-		title += " " + lipgloss.NewStyle().Foreground(peach).Render("new")
+		title += " " + lipgloss.NewStyle().Foreground(accent).Render("new")
 	}
 	return title
 }
@@ -68,7 +68,7 @@ func NewTracksScreen(client *api.Client, ws *workspace.Workspace) *TracksScreen 
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(mauve).
+		Foreground(accent).
 		MarginLeft(2)
 
 	// Vim-style keybindings

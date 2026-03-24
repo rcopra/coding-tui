@@ -70,7 +70,7 @@ func NewCommunityScreen(client *api.Client, trackSlug, exerciseSlug string) *Com
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(mauve).
+		Foreground(accent).
 		MarginLeft(2)
 
 	l.KeyMap.CursorUp = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up"))
@@ -249,7 +249,7 @@ func (s *SolutionViewerScreen) renderFiles(files []api.CommunitySolutionFile) st
 	for _, f := range files {
 		header := lipgloss.NewStyle().
 			Bold(true).
-			Foreground(mauve).
+			Foreground(accent).
 			Render("  " + f.Filename)
 
 		// Wrap code in markdown fenced block for glamour to syntax highlight

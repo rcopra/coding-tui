@@ -88,7 +88,7 @@ func NewExercisesScreen(client *api.Client, ws *workspace.Workspace, trackSlug, 
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lavender).
+		Foreground(accent).
 		MarginLeft(2)
 
 	// Vim-style keybindings

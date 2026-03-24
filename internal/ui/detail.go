@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
@@ -290,18 +289,16 @@ func (s *DetailScreen) View() string {
 		return "  Loading instructions..."
 	}
 
-	// Title header with scroll percentage
-	title := lipgloss.NewStyle().Bold(true).Foreground(mauve).Render(s.exercise.Title)
-	scrollPct := fmt.Sprintf("%3.f%%", s.viewport.ScrollPercent()*100)
-	scrollInfo := subtle.Render(scrollPct)
-	gap := s.width - lipgloss.Width(title) - lipgloss.Width(scrollInfo) - 4
-	if gap < 0 {
-		gap = 0
-	}
-	header := "  " + title + strings.Repeat(" ", gap) + scrollInfo
+	// Title header
+	title := lipgloss.NewStyle().Bold(true).Foreground(accent).Render(s.exercise.Title)
+	header := "  " + title
+
+	// Viewport with scrollbar
+	vpContent := s.viewport.View()
+	vpContent = renderScrollbar(vpContent, s.viewport.Height(), s.viewport.TotalLineCount(), s.viewport.YOffset())
 
 	status := s.buildStatusLine()
-	return header + "\n" + s.viewport.View() + "\n" + status
+	return header + "\n" + vpContent + "\n" + status
 }
 
 func (s *DetailScreen) buildStatusLine() string {
@@ -319,7 +316,7 @@ func (s *DetailScreen) buildStatusLine() string {
 	parts = append(parts, subtle.Render(s.exercise.Type))
 
 	if s.statusMsg != "" {
-		parts = append(parts, lipgloss.NewStyle().Foreground(peach).Render(s.statusMsg))
+		parts = append(parts, lipgloss.NewStyle().Foreground(accent).Render(s.statusMsg))
 	}
 
 	line := "  "
