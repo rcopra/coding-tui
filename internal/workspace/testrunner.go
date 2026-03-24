@@ -40,11 +40,32 @@ var testCommands = map[string][]string{
 	"php":        {"phpunit"},
 }
 
+// Tracks that need dependency installation before tests can run.
+var installCommands = map[string][]string{
+	"javascript": {"npm", "install"},
+	"typescript": {"npm", "install"},
+}
+
 // RunTests runs the test suite for an exercise locally.
+// Automatically installs dependencies first for tracks that need it.
 func (w *Workspace) RunTests(trackSlug, exerciseSlug string) (*TestResult, error) {
 	dir := w.ExerciseDir(trackSlug, exerciseSlug)
 	if _, err := os.Stat(dir); err != nil {
 		return nil, fmt.Errorf("exercise not downloaded: %s", dir)
+	}
+
+	// Install dependencies if needed and not already installed
+	if installCmd, ok := installCommands[trackSlug]; ok {
+		if _, err := os.Stat(filepath.Join(dir, "node_modules")); err != nil {
+			cmd := exec.Command(installCmd[0], installCmd[1:]...)
+			cmd.Dir = dir
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return &TestResult{
+					Passed: false,
+					Output: fmt.Sprintf("Failed to install dependencies:\n%s", string(out)),
+				}, nil
+			}
+		}
 	}
 
 	cmdParts, err := resolveTestCommand(trackSlug, dir)

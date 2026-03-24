@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -57,7 +58,22 @@ func (w *Workspace) Download(trackSlug, exerciseSlug string) (string, error) {
 		}
 	}
 
+	// Auto-install dependencies for tracks that need it
+	w.installDeps(trackSlug, dir)
+
 	return dir, nil
+}
+
+// installDeps runs dependency installation for tracks that need it (JS, TS, etc.)
+func (w *Workspace) installDeps(trackSlug, dir string) {
+	switch trackSlug {
+	case "javascript", "typescript":
+		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+			cmd := exec.Command("npm", "install")
+			cmd.Dir = dir
+			_ = cmd.Run()
+		}
+	}
 }
 
 // ReadInstructions reads the README.md from a downloaded exercise.
