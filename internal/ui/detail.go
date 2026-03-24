@@ -53,6 +53,9 @@ type DetailScreen struct {
 
 func NewDetailScreen(client *api.Client, ws *workspace.Workspace, exercise api.Exercise, trackSlug string) *DetailScreen {
 	vp := viewport.New()
+	// Disable d/u half-page bindings — d conflicts with download, u is unexpected
+	vp.KeyMap.HalfPageDown.SetEnabled(false)
+	vp.KeyMap.HalfPageUp.SetEnabled(false)
 
 	return &DetailScreen{
 		client:     client,
@@ -125,10 +128,15 @@ func (s *DetailScreen) openInNvim(newPane bool) tea.Cmd {
 }
 
 func (s *DetailScreen) SetSize(width, height int) {
+	oldWidth := s.width
 	s.width = width
 	s.height = height
 	s.viewport.SetWidth(width)
 	s.viewport.SetHeight(height - 2) // leave room for status line
+	// Re-render markdown if width changed and we have content
+	if oldWidth != width && s.instructions != "" {
+		s.updateContent()
+	}
 }
 
 func (s *DetailScreen) renderMarkdown(md string) string {

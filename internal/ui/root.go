@@ -88,6 +88,7 @@ func (r Root) View() tea.View {
 
 	v := tea.NewView(header + "\n\n" + body + "\n" + helpBar)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

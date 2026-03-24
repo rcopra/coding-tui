@@ -58,11 +58,12 @@ func tmuxSendToNvim(filePath string) tea.Cmd {
 	}
 }
 
-// tmuxOpenNewPane opens a new tmux split with nvim pointing at the file.
+// tmuxOpenNewPane opens a new tmux split to the left with nvim pointing at the file.
 func tmuxOpenNewPane(filePath string) tea.Cmd {
 	return func() tea.Msg {
 		dir := filepath.Dir(filePath)
-		cmd := exec.Command("tmux", "split-window", "-h", "-c", dir, "nvim", filePath)
+		// -hb: horizontal split, before (left of current pane)
+		cmd := exec.Command("tmux", "split-window", "-hb", "-c", dir, "nvim", filePath)
 		err := cmd.Run()
 		return tmuxSentMsg{err: err}
 	}
