@@ -54,11 +54,20 @@ func (w *Workspace) RunTests(trackSlug, exerciseSlug string) (*TestResult, error
 		return nil, fmt.Errorf("exercise not downloaded: %s", dir)
 	}
 
-	// Install dependencies if needed and not already installed
+	// Install shared dependencies at track root if needed
 	if installCmd, ok := installCommands[trackSlug]; ok {
-		if _, err := os.Stat(filepath.Join(dir, "node_modules")); err != nil {
+		trackRoot := filepath.Dir(dir)
+		if _, err := os.Stat(filepath.Join(trackRoot, "node_modules")); err != nil {
+			// Copy package.json to track root if missing
+			pkgSrc := filepath.Join(dir, "package.json")
+			pkgDst := filepath.Join(trackRoot, "package.json")
+			if _, err := os.Stat(pkgDst); err != nil {
+				if data, readErr := os.ReadFile(pkgSrc); readErr == nil {
+					_ = os.WriteFile(pkgDst, data, 0o644)
+				}
+			}
 			cmd := exec.Command(installCmd[0], installCmd[1:]...)
-			cmd.Dir = dir
+			cmd.Dir = trackRoot
 			if out, err := cmd.CombinedOutput(); err != nil {
 				return &TestResult{
 					Passed: false,

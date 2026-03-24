@@ -64,15 +64,33 @@ func (w *Workspace) Download(trackSlug, exerciseSlug string) (string, error) {
 	return dir, nil
 }
 
-// installDeps runs dependency installation for tracks that need it (JS, TS, etc.)
-func (w *Workspace) installDeps(trackSlug, dir string) {
+// installDeps installs shared dependencies at the track root level.
+// Node's module resolution walks up the directory tree, so installing
+// once at ~/exercism/javascript/ serves all exercises under it.
+// Only runs if node_modules doesn't already exist at the track root.
+func (w *Workspace) installDeps(trackSlug, exerciseDir string) {
 	switch trackSlug {
 	case "javascript", "typescript":
-		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
-			cmd := exec.Command("npm", "install")
-			cmd.Dir = dir
-			_ = cmd.Run()
+		trackRoot := filepath.Dir(exerciseDir)
+		nodeModules := filepath.Join(trackRoot, "node_modules")
+
+		// Already installed at track root — nothing to do
+		if _, err := os.Stat(nodeModules); err == nil {
+			return
 		}
+
+		// Copy the exercise's package.json to the track root and install there
+		pkgSrc := filepath.Join(exerciseDir, "package.json")
+		pkgDst := filepath.Join(trackRoot, "package.json")
+		if _, err := os.Stat(pkgDst); err != nil {
+			if data, err := os.ReadFile(pkgSrc); err == nil {
+				_ = os.WriteFile(pkgDst, data, 0o644)
+			}
+		}
+
+		cmd := exec.Command("npm", "install")
+		cmd.Dir = trackRoot
+		_ = cmd.Run()
 	}
 }
 
