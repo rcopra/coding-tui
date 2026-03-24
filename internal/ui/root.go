@@ -86,7 +86,16 @@ func (r Root) View() tea.View {
 	body := r.current().View()
 	helpBar := r.renderHelp()
 
-	v := tea.NewView(header + "\n\n" + body + "\n" + helpBar)
+	content := header + "\n\n" + body + "\n" + helpBar
+
+	// Force pure black background across the entire screen
+	bg := lipgloss.NewStyle().
+		Background(lipgloss.Color("#000000")).
+		Width(r.width).
+		Height(r.height)
+	content = bg.Render(content)
+
+	v := tea.NewView(content)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
