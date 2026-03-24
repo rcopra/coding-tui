@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
@@ -163,8 +164,30 @@ func (s *DetailScreen) renderMarkdown(md string) string {
 	return rendered
 }
 
+// stripFirstH1 removes the first markdown H1 heading (and any blank lines after it)
+// since we render the title separately in the header bar.
+func stripFirstH1(md string) string {
+	lines := strings.Split(md, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "# ") && !strings.HasPrefix(trimmed, "##") {
+			// Remove the H1 line and any immediately following blank lines
+			rest := lines[i+1:]
+			for len(rest) > 0 && strings.TrimSpace(rest[0]) == "" {
+				rest = rest[1:]
+			}
+			return strings.Join(append(lines[:i], rest...), "\n")
+		}
+		// Stop looking after we hit non-blank content that isn't an H1
+		if trimmed != "" {
+			break
+		}
+	}
+	return md
+}
+
 func (s *DetailScreen) updateContent() {
-	content := s.instructions
+	content := stripFirstH1(s.instructions)
 	if s.showHints && s.hints != "" {
 		content += "\n---\n\n## Hints\n\n" + s.hints
 	}
