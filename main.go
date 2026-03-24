@@ -30,8 +30,13 @@ func main() {
 	tracks := ui.NewTracksScreen(client, ws)
 	root := ui.NewRoot(tracks)
 
+	// Set terminal background to true black while the TUI runs
+	fmt.Print("\033]11;#000000\a")
+	defer fmt.Print("\033]111\a") // reset to terminal default on exit
+
 	p := tea.NewProgram(root)
 	if _, err := p.Run(); err != nil {
+		fmt.Print("\033]111\a") // reset bg on error too
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

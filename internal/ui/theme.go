@@ -14,16 +14,16 @@ import (
 // High contrast white text on true black. Reads like a document.
 var (
 	black  = lipgloss.Color("#000000") // true black background
-	white  = lipgloss.Color("#c0caf5") // body text (tokyo night fg)
-	dim    = lipgloss.Color("#565f89") // muted text, comments, chrome
-	faint  = lipgloss.Color("#24283b") // scrollbar track, very subtle
+	white  = lipgloss.Color("#e8e8e8") // body text — bright, high contrast
+	dim    = lipgloss.Color("#636da6") // muted text, chrome
+	faint  = lipgloss.Color("#1a1b26") // scrollbar track
 	accent = lipgloss.Color("#7aa2f7") // bright blue — headings, primary
-	gold   = lipgloss.Color("#e0af68") // golden — section headings, warnings
+	gold   = lipgloss.Color("#e0af68") // golden — section headings
 	green  = lipgloss.Color("#9ece6a") // success, easy, strings
 	yellow = lipgloss.Color("#e0af68") // medium difficulty
 	red    = lipgloss.Color("#f7768e") // errors, hard, inline code
 	peach  = lipgloss.Color("#ff9e64") // status messages, numbers
-	purple = lipgloss.Color("#bb9af7") // keywords, accent2
+	purple = lipgloss.Color("#bb9af7") // keywords
 )
 
 func stringPtr(s string) *string { return &s }
@@ -36,7 +36,7 @@ func exercismGlamourStyle() ansi.StyleConfig {
 	s := styles.DarkStyleConfig
 
 	// Document: clean white text, tight margin
-	s.Document.StylePrimitive.Color = stringPtr("#c0caf5")
+	s.Document.StylePrimitive.Color = stringPtr("#e8e8e8")
 	s.Document.Margin = uintPtr(1)
 
 	// Headings: bright blue like OpenCode
@@ -69,12 +69,12 @@ func exercismGlamourStyle() ansi.StyleConfig {
 	s.CodeBlock = ansi.StyleCodeBlock{
 		StyleBlock: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
-				Color: stringPtr("#c0caf5"),
+				Color: stringPtr("#e8e8e8"),
 			},
 			Margin: uintPtr(1),
 		},
 		Chroma: &ansi.Chroma{
-			Text:    ansi.StylePrimitive{Color: stringPtr("#c0caf5")},
+			Text:    ansi.StylePrimitive{Color: stringPtr("#e8e8e8")},
 			Error:   ansi.StylePrimitive{Color: stringPtr("#f7768e")},
 			Comment: ansi.StylePrimitive{Color: stringPtr("#565f89")},
 			CommentPreproc: ansi.StylePrimitive{Color: stringPtr("#ff9e64")},
@@ -83,8 +83,8 @@ func exercismGlamourStyle() ansi.StyleConfig {
 			KeywordNamespace: ansi.StylePrimitive{Color: stringPtr("#bb9af7")},
 			KeywordType:      ansi.StylePrimitive{Color: stringPtr("#2ac3de")},
 			Operator:         ansi.StylePrimitive{Color: stringPtr("#89ddff")},
-			Punctuation:      ansi.StylePrimitive{Color: stringPtr("#c0caf5")},
-			Name:             ansi.StylePrimitive{Color: stringPtr("#c0caf5")},
+			Punctuation:      ansi.StylePrimitive{Color: stringPtr("#e8e8e8")},
+			Name:             ansi.StylePrimitive{Color: stringPtr("#e8e8e8")},
 			NameBuiltin:      ansi.StylePrimitive{Color: stringPtr("#ff9e64")},
 			NameTag:          ansi.StylePrimitive{Color: stringPtr("#f7768e")},
 			NameAttribute:    ansi.StylePrimitive{Color: stringPtr("#e0af68")},
