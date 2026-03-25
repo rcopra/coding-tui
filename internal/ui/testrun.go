@@ -204,14 +204,53 @@ func (s *TestRunScreen) formatRawOutput() string {
 		trimmed := strings.TrimSpace(line)
 		styled := "  " + line
 
-		// Highlight pass/fail patterns in raw output
 		switch {
-		case strings.Contains(trimmed, "PASS") || strings.Contains(trimmed, "passed") ||
-			strings.Contains(trimmed, "ok ") || strings.Contains(trimmed, "0 failures"):
-			styled = "  " + passText.Render(line)
-		case strings.Contains(trimmed, "FAIL") || strings.Contains(trimmed, "failed") ||
-			strings.Contains(trimmed, "Error") || strings.Contains(trimmed, "error"):
+		// Failed test lines: × ✕ ✗ ✘ markers (Jest uses ×)
+		case strings.Contains(trimmed, "×") || strings.Contains(trimmed, "✕") ||
+			strings.Contains(trimmed, "✗") || strings.Contains(trimmed, "✘"):
 			styled = "  " + failText.Render(line)
+		// Passed test lines: ✓ ✔ markers
+		case strings.Contains(trimmed, "✓") || strings.Contains(trimmed, "✔"):
+			styled = "  " + passText.Render(line)
+		// Failure detail headers: ● marker
+		case strings.HasPrefix(trimmed, "●"):
+			styled = "  " + lipgloss.NewStyle().Foreground(red).Bold(true).Render(line)
+		// PASS/ok lines
+		case strings.HasPrefix(trimmed, "PASS") || strings.HasPrefix(trimmed, "ok ") ||
+			strings.Contains(trimmed, "0 failures"):
+			styled = "  " + passText.Render(line)
+		// FAIL lines
+		case strings.HasPrefix(trimmed, "FAIL"):
+			styled = "  " + failText.Render(line)
+		// Expected values
+		case strings.HasPrefix(trimmed, "Expected:"):
+			styled = "  " + passText.Render(line)
+		// Received values
+		case strings.HasPrefix(trimmed, "Received:"):
+			styled = "  " + failText.Render(line)
+		// Code pointer lines (> 11 |  code)
+		case strings.HasPrefix(trimmed, ">") && strings.Contains(trimmed, "|"):
+			styled = "  " + lipgloss.NewStyle().Foreground(yellow).Render(line)
+		// Line number context (  12 |  })
+		case len(trimmed) > 0 && trimmed[0] >= '0' && trimmed[0] <= '9' && strings.Contains(trimmed, "|"):
+			styled = "  " + dimText.Render(line)
+		// Caret pointer line (  |  ^)
+		case strings.Contains(trimmed, "|") && strings.Contains(trimmed, "^") &&
+			strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(trimmed, "|", ""), "^", "")) == "":
+			styled = "  " + failText.Render(line)
+		// Stack trace / location lines
+		case strings.HasPrefix(trimmed, "at "):
+			styled = "  " + dimText.Render(line)
+		// Assertion descriptions (expect().toBe(), etc.)
+		case strings.Contains(trimmed, "expect(") && strings.Contains(trimmed, "//"):
+			styled = "  " + dimText.Render(line)
+		// General error/fail keywords
+		case strings.Contains(trimmed, "Error") || strings.Contains(trimmed, "error") ||
+			strings.Contains(trimmed, "failed"):
+			styled = "  " + failText.Render(line)
+		case strings.Contains(trimmed, "passed"):
+			styled = "  " + passText.Render(line)
+		// Comments and separators
 		case strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "---") ||
 			strings.HasPrefix(trimmed, "//"):
 			styled = "  " + dimText.Render(line)
