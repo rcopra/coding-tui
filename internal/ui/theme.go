@@ -147,6 +147,9 @@ func exercismGlamourStyle() ansi.StyleConfig {
 		IndentToken: stringPtr("│ "),
 	}
 
+	// Lists: wider nesting indent for readability
+	s.List.LevelIndent = 4
+
 	// List items: clean bullet
 	s.Item = ansi.StylePrimitive{
 		BlockPrefix: "• ",

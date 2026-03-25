@@ -177,75 +177,34 @@ func (s *DetailScreen) renderMarkdown(md string) string {
 	if err != nil {
 		return md
 	}
-	return addCodeBlockBars(rendered)
+	return postProcessMarkdown(rendered)
 }
 
-// addCodeBlockBars post-processes glamour output to inject a subtle left bar
-// on code block lines. Two passes: first identify code lines, then fill gaps.
-func addCodeBlockBars(rendered string) string {
-	bar := lipgloss.NewStyle().Foreground(lipgloss.Color("#484848")).Render("│") + " "
-
+// postProcessMarkdown adds breathing room to glamour output:
+// - blank line between adjacent list items
+// - blank line before numbered list items
+func postProcessMarkdown(rendered string) string {
 	lines := strings.Split(rendered, "\n")
-	isCode := make([]bool, len(lines))
+	var out []string
 
-	// Pass 1: mark lines with 4+ leading visible spaces and content as code
 	for i, line := range lines {
 		stripped := xansi.Strip(line)
-		if len(stripped) == 0 {
-			continue
-		}
-		leadingSpaces := 0
-		for _, ch := range stripped {
-			if ch == ' ' {
-				leadingSpaces++
-			} else {
-				break
+		trimmed := strings.TrimLeft(stripped, " ")
+
+		isBullet := strings.HasPrefix(trimmed, "• ")
+		isNumbered := len(trimmed) > 2 && trimmed[0] >= '1' && trimmed[0] <= '9' && strings.Contains(trimmed[:4], ". ")
+
+		if i > 0 && (isBullet || isNumbered) {
+			// Add blank line before this item if previous line isn't already blank
+			prevStripped := strings.TrimSpace(xansi.Strip(lines[i-1]))
+			if prevStripped != "" {
+				out = append(out, "")
 			}
 		}
-		hasContent := len(strings.TrimSpace(stripped)) > 0
-		isCode[i] = leadingSpaces >= 4 && hasContent
+		out = append(out, line)
 	}
 
-	// Pass 2: fill blank gaps between code lines (blank line inside a code block)
-	for i := 1; i < len(lines)-1; i++ {
-		if !isCode[i] {
-			// Check if there's a code line before and after (within 3 lines)
-			hasBefore := false
-			hasAfter := false
-			for j := i - 1; j >= 0 && j >= i-3; j-- {
-				if isCode[j] {
-					hasBefore = true
-					break
-				}
-				stripped := strings.TrimSpace(xansi.Strip(lines[j]))
-				if stripped != "" {
-					break // hit non-blank non-code content
-				}
-			}
-			for j := i + 1; j < len(lines) && j <= i+3; j++ {
-				if isCode[j] {
-					hasAfter = true
-					break
-				}
-				stripped := strings.TrimSpace(xansi.Strip(lines[j]))
-				if stripped != "" {
-					break
-				}
-			}
-			if hasBefore && hasAfter {
-				isCode[i] = true
-			}
-		}
-	}
-
-	// Pass 3: inject the bar
-	for i, line := range lines {
-		if isCode[i] && len(line) >= 2 && line[0] == ' ' && line[1] == ' ' {
-			lines[i] = "  " + bar + line[2:]
-		}
-	}
-
-	return strings.Join(lines, "\n")
+	return strings.Join(out, "\n")
 }
 
 // stripFirstH1 removes the first markdown H1 heading (and any blank lines after it)
@@ -319,6 +278,7 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 	case submitDoneMsg:
 		s.running = false
+		s.statusMsg = ""
 		if msg.err != nil {
 			s.statusMsg = fmt.Sprintf("Submit failed: %v", msg.err)
 			return s, nil
@@ -331,6 +291,7 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 	case completeDoneMsg:
 		s.running = false
+		s.statusMsg = ""
 		if msg.err != nil {
 			s.statusMsg = fmt.Sprintf("Complete failed: %v", msg.err)
 			return s, nil

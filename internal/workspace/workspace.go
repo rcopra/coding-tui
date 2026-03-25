@@ -103,6 +103,19 @@ func (w *Workspace) Download(trackSlug, exerciseSlug string) (string, error) {
 		}
 	}
 
+	// Write .exercism/metadata.json (Exercism CLI creates this locally;
+	// the API doesn't include it in the file list, but submit needs it)
+	meta := ExerciseMetadata{
+		Track:    trackSlug,
+		Exercise: exerciseSlug,
+		ID:       sol.ID,
+		URL:      sol.URL,
+	}
+	metaData, _ := json.Marshal(meta)
+	metaPath := filepath.Join(dir, ".exercism", "metadata.json")
+	_ = os.MkdirAll(filepath.Dir(metaPath), 0o755)
+	_ = os.WriteFile(metaPath, metaData, 0o644)
+
 	// Auto-install dependencies for tracks that need it
 	w.installDeps(trackSlug, dir)
 
@@ -311,17 +324,34 @@ type ExerciseConfig struct {
 }
 
 // ReadMetadata reads the .exercism/metadata.json for a downloaded exercise.
+// If the file is missing (e.g. downloaded before the TUI started writing it),
+// it fetches the solution from the API and creates the file.
 func (w *Workspace) ReadMetadata(trackSlug, exerciseSlug string) (*ExerciseMetadata, error) {
 	path := filepath.Join(w.ExerciseDir(trackSlug, exerciseSlug), ".exercism", "metadata.json")
 	data, err := os.ReadFile(path)
+	if err == nil {
+		var meta ExerciseMetadata
+		if err := json.Unmarshal(data, &meta); err != nil {
+			return nil, fmt.Errorf("parsing metadata: %w", err)
+		}
+		return &meta, nil
+	}
+
+	// Missing — fetch from API and create it
+	sol, err := w.client.GetLatestSolution(trackSlug, exerciseSlug)
 	if err != nil {
-		return nil, fmt.Errorf("reading metadata: %w", err)
+		return nil, fmt.Errorf("fetching solution for metadata: %w", err)
 	}
-	var meta ExerciseMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return nil, fmt.Errorf("parsing metadata: %w", err)
+	meta := &ExerciseMetadata{
+		Track:    trackSlug,
+		Exercise: exerciseSlug,
+		ID:       sol.ID,
+		URL:      sol.URL,
 	}
-	return &meta, nil
+	metaData, _ := json.Marshal(meta)
+	_ = os.MkdirAll(filepath.Dir(path), 0o755)
+	_ = os.WriteFile(path, metaData, 0o644)
+	return meta, nil
 }
 
 // ReadConfig reads the .exercism/config.json for a downloaded exercise.

@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
@@ -112,6 +113,7 @@ type ExercisesScreen struct {
 	exercises []api.Exercise
 	sortMode  sortMode
 	loaded    bool
+	showHelp  bool
 	err       error
 	width     int
 	height    int
@@ -193,6 +195,10 @@ func (s *ExercisesScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		return s, nil
 
 	case tea.KeyPressMsg:
+		if s.showHelp {
+			s.showHelp = false
+			return s, nil
+		}
 		if s.list.FilterState() == list.Filtering {
 			break
 		}
@@ -203,6 +209,9 @@ func (s *ExercisesScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				return s, nil
 			}
 			return s, func() tea.Msg { return PopScreenMsg{} }
+		case "?":
+			s.showHelp = true
+			return s, nil
 		case "S":
 			if s.loaded {
 				s.sortMode = (s.sortMode + 1) % sortModeCount
@@ -242,7 +251,42 @@ func (s *ExercisesScreen) View() string {
 	if !s.loaded {
 		return "  Loading exercises..."
 	}
+	if s.showHelp {
+		return s.renderHelp()
+	}
 	return s.list.View()
+}
+
+func (s *ExercisesScreen) renderHelp() string {
+	title := lipgloss.NewStyle().Bold(true).Foreground(accent).Render("  Keybindings")
+
+	keyStyle := lipgloss.NewStyle().Foreground(accent).Width(12)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#d4be98"))
+
+	lines := []struct{ key, desc string }{
+		{"j / k", "Move down / up"},
+		{"g / G", "Jump to top / bottom"},
+		{"enter", "Open exercise"},
+		{"/", "Filter by name"},
+		{"esc", "Clear filter / go back"},
+		{"S", "Cycle sort mode"},
+		{"x", "Dismiss / restore exercise"},
+		{"?", "Toggle this help"},
+		{"q", "Go back"},
+	}
+
+	var b strings.Builder
+	b.WriteString(title + "\n\n")
+	for _, l := range lines {
+		b.WriteString("  " + keyStyle.Render(l.key) + descStyle.Render(l.desc) + "\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(subtle.Render("  Sort modes: default · difficulty · a-z · type") + "\n")
+	b.WriteString("\n")
+	b.WriteString(subtle.Render("  ● practice  ◆ concept  ★ tutorial  ✓ completed  · dismissed"))
+
+	return b.String()
 }
 
 // exerciseSortKey returns a numeric priority for sorting exercises:
