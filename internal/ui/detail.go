@@ -166,23 +166,19 @@ func (s *DetailScreen) renderMarkdown(md string) string {
 }
 
 // addCodeBlockBars post-processes glamour output to inject a subtle left bar
-// on code block lines. Code blocks have Margin:4, prose has Margin:2.
-// We detect the difference using ANSI-aware width measurement, then prepend a bar.
+// on code block lines. Two passes: first identify code lines, then fill gaps.
 func addCodeBlockBars(rendered string) string {
 	bar := lipgloss.NewStyle().Foreground(lipgloss.Color("#484848")).Render("│") + " "
 
 	lines := strings.Split(rendered, "\n")
+	isCode := make([]bool, len(lines))
+
+	// Pass 1: mark lines with 4+ leading visible spaces and content as code
 	for i, line := range lines {
-		if line == "" {
-			continue
-		}
-		// Strip ANSI to measure visible leading whitespace
 		stripped := xansi.Strip(line)
 		if len(stripped) == 0 {
 			continue
 		}
-
-		// Count leading spaces in the visible (stripped) text
 		leadingSpaces := 0
 		for _, ch := range stripped {
 			if ch == ' ' {
@@ -191,19 +187,49 @@ func addCodeBlockBars(rendered string) string {
 				break
 			}
 		}
-
-		// Code blocks have margin=4 → 4+ leading spaces with actual content after
-		// Prose has margin=2 → 2 leading spaces
-		// Blank/spacer lines are all whitespace — skip those
 		hasContent := len(strings.TrimSpace(stripped)) > 0
-		isCodeLine := leadingSpaces >= 4 && hasContent
+		isCode[i] = leadingSpaces >= 4 && hasContent
+	}
 
-		if isCodeLine {
-			if len(line) >= 2 && line[0] == ' ' && line[1] == ' ' {
-				lines[i] = "  " + bar + line[2:]
+	// Pass 2: fill blank gaps between code lines (blank line inside a code block)
+	for i := 1; i < len(lines)-1; i++ {
+		if !isCode[i] {
+			// Check if there's a code line before and after (within 3 lines)
+			hasBefore := false
+			hasAfter := false
+			for j := i - 1; j >= 0 && j >= i-3; j-- {
+				if isCode[j] {
+					hasBefore = true
+					break
+				}
+				stripped := strings.TrimSpace(xansi.Strip(lines[j]))
+				if stripped != "" {
+					break // hit non-blank non-code content
+				}
+			}
+			for j := i + 1; j < len(lines) && j <= i+3; j++ {
+				if isCode[j] {
+					hasAfter = true
+					break
+				}
+				stripped := strings.TrimSpace(xansi.Strip(lines[j]))
+				if stripped != "" {
+					break
+				}
+			}
+			if hasBefore && hasAfter {
+				isCode[i] = true
 			}
 		}
 	}
+
+	// Pass 3: inject the bar
+	for i, line := range lines {
+		if isCode[i] && len(line) >= 2 && line[0] == ' ' && line[1] == ' ' {
+			lines[i] = "  " + bar + line[2:]
+		}
+	}
+
 	return strings.Join(lines, "\n")
 }
 
