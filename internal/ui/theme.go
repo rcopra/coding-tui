@@ -75,16 +75,17 @@ func exercismGlamourStyle() ansi.StyleConfig {
 		},
 	}
 
-	// Code blocks: subtle dark surface background to distinguish from prose
+	// Code blocks: left-indented with a visible border-like indent token
 	s.CodeBlock = ansi.StyleCodeBlock{
 		StyleBlock: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
-				Color:           stringPtr("#eeeeee"),
-				BackgroundColor: stringPtr("#141414"),
-				BlockPrefix:     "\n",
-				BlockSuffix:     "\n",
+				Color:       stringPtr("#eeeeee"),
+				BlockPrefix: "\n",
+				BlockSuffix: "\n",
 			},
-			Margin: uintPtr(2),
+			Indent:      uintPtr(1),
+			IndentToken: stringPtr("│ "),
+			Margin:      uintPtr(2),
 		},
 		Chroma: &ansi.Chroma{
 			Text:    ansi.StylePrimitive{Color: stringPtr("#eeeeee")},
