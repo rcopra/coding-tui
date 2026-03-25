@@ -192,11 +192,13 @@ func addCodeBlockBars(rendered string) string {
 			}
 		}
 
-		// Code blocks have margin=4 → 4+ leading spaces
+		// Code blocks have margin=4 → 4+ leading spaces with actual content after
 		// Prose has margin=2 → 2 leading spaces
-		// Only mark lines with 4+ leading spaces as code
-		if leadingSpaces >= 4 {
-			// Prepend bar after the initial 2 plain spaces
+		// Blank/spacer lines are all whitespace — skip those
+		hasContent := len(strings.TrimSpace(stripped)) > 0
+		isCodeLine := leadingSpaces >= 4 && hasContent
+
+		if isCodeLine {
 			if len(line) >= 2 && line[0] == ' ' && line[1] == ' ' {
 				lines[i] = "  " + bar + line[2:]
 			}
