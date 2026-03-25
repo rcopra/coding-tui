@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sort"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
@@ -146,8 +147,12 @@ func (s *ExercisesScreen) SetSize(width, height int) {
 func (s *ExercisesScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case exercisesLoadedMsg:
-		items := make([]list.Item, len(msg.exercises))
-		for i, e := range msg.exercises {
+		exercises := msg.exercises
+		sort.SliceStable(exercises, func(i, j int) bool {
+			return s.exerciseSortKey(exercises[i]) < s.exerciseSortKey(exercises[j])
+		})
+		items := make([]list.Item, len(exercises))
+		for i, e := range exercises {
 			items[i] = exerciseItem{exercise: e}
 		}
 		cmd := s.list.SetItems(items)
@@ -193,6 +198,25 @@ func (s *ExercisesScreen) View() string {
 		return "  Loading exercises..."
 	}
 	return s.list.View()
+}
+
+// exerciseSortKey returns a numeric priority for sorting exercises:
+// 0 = recommended + in progress, 1 = recommended, 2 = in progress,
+// 3 = unlocked, 4 = locked.
+func (s *ExercisesScreen) exerciseSortKey(e api.Exercise) int {
+	inProgress := s.workspace.IsDownloaded(s.trackSlug, e.Slug)
+	switch {
+	case e.IsRecommended && inProgress:
+		return 0
+	case inProgress:
+		return 1
+	case e.IsRecommended:
+		return 2
+	case e.IsUnlocked:
+		return 3
+	default:
+		return 4
+	}
 }
 
 func (s *ExercisesScreen) ShortHelp() []key.Binding {

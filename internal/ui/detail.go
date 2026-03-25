@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,6 +28,8 @@ type hintsLoadedMsg struct {
 type downloadedMsg struct {
 	dir string
 }
+
+type trackNotJoinedMsg struct{}
 
 type detailErrMsg struct {
 	err error
@@ -93,6 +96,9 @@ func (s *DetailScreen) fetchHints() tea.Msg {
 func (s *DetailScreen) doDownload() tea.Msg {
 	dir, err := s.workspace.Download(s.trackSlug, s.exercise.Slug)
 	if err != nil {
+		if errors.Is(err, api.ErrTrackNotJoined) {
+			return trackNotJoinedMsg{}
+		}
 		return detailErrMsg{err: err}
 	}
 	return downloadedMsg{dir: dir}
@@ -278,6 +284,11 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		}
 		s.updateContent()
 		return s, nil
+
+	case trackNotJoinedMsg:
+		url := fmt.Sprintf("https://exercism.org/tracks/%s", s.trackSlug)
+		s.statusMsg = "Track not joined — opening browser to join, then press d again"
+		return s, openBrowser(url)
 
 	case downloadedMsg:
 		s.downloaded = true

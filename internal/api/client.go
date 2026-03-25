@@ -2,13 +2,18 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rcopra/coding-tui/internal/cache"
 )
+
+// ErrTrackNotJoined is returned when the API returns a track_not_joined error.
+var ErrTrackNotJoined = errors.New("you have not joined this track")
 
 const (
 	websiteAPI = "https://exercism.org/api/v2"
@@ -54,6 +59,9 @@ func (c *Client) get(url string, needsAuth bool) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusForbidden && strings.Contains(string(body), "track_not_joined") {
+			return nil, ErrTrackNotJoined
+		}
 		return nil, fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
 	}
 
