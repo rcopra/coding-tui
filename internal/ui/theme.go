@@ -75,7 +75,8 @@ func exercismGlamourStyle() ansi.StyleConfig {
 		},
 	}
 
-	// Code blocks: clean left bar to separate from prose
+	// Code blocks: visible left accent bar to separate from prose.
+	// Using a full-width bar character with extra indent so it stands out.
 	s.CodeBlock = ansi.StyleCodeBlock{
 		StyleBlock: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
@@ -83,8 +84,8 @@ func exercismGlamourStyle() ansi.StyleConfig {
 				BlockPrefix: "\n",
 				BlockSuffix: "\n",
 			},
-			Indent:      uintPtr(1),
-			IndentToken: stringPtr("▎"),
+			Indent:      uintPtr(2),
+			IndentToken: stringPtr("┃ "),
 			Margin:      uintPtr(2),
 		},
 		Chroma: &ansi.Chroma{
