@@ -75,11 +75,14 @@ func exercismGlamourStyle() ansi.StyleConfig {
 		},
 	}
 
-	// Code blocks: OpenCode-style syntax highlighting
+	// Code blocks: subtle dark surface background to distinguish from prose
 	s.CodeBlock = ansi.StyleCodeBlock{
 		StyleBlock: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
-				Color: stringPtr("#eeeeee"),
+				Color:           stringPtr("#eeeeee"),
+				BackgroundColor: stringPtr("#141414"),
+				BlockPrefix:     "\n",
+				BlockSuffix:     "\n",
 			},
 			Margin: uintPtr(2),
 		},

@@ -102,7 +102,7 @@ func (s *DetailScreen) doRunTests() tea.Msg {
 	if err != nil {
 		return detailErrMsg{err: err}
 	}
-	return testResultMsg{passed: result.Passed, output: result.Output}
+	return testResultMsg{result: result}
 }
 
 func (s *DetailScreen) doSubmit() tea.Msg {
@@ -224,7 +224,7 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 	case testResultMsg:
 		s.running = false
-		screen := NewTestRunScreen(s.exercise.Title, msg.passed, msg.output)
+		screen := NewTestRunScreen(msg.result)
 		return s, pushScreen(screen)
 
 	case submitDoneMsg:

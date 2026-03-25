@@ -9,10 +9,21 @@ import (
 	"strings"
 )
 
-// TestResult holds the output of a local test run.
+// TestCase represents a single test result.
+type TestCase struct {
+	Name    string
+	Status  string // "passed", "failed", "pending"
+	Message string // failure message if any
+}
+
+// TestResult holds structured test output.
 type TestResult struct {
-	Passed bool
-	Output string
+	Passed    bool
+	Total     int
+	PassCount int
+	FailCount int
+	Cases     []TestCase
+	RawOutput string // fallback when structured parsing isn't available
 }
 
 // track slug → test command parts
@@ -20,8 +31,8 @@ var testCommands = map[string][]string{
 	"go":         {"go", "test", "-v", "./..."},
 	"rust":       {"cargo", "test"},
 	"python":     {"python3", "-m", "pytest", "-v"},
-	"javascript": {"npm", "test"},
-	"typescript": {"npm", "test"},
+	"javascript": {"npx", "jest", "--json", "--no-coverage"},
+	"typescript": {"npx", "jest", "--json", "--no-coverage"},
 	"ruby":       {"ruby", "-r", "minitest/autorun"},
 	"elixir":     {"mix", "test"},
 	"java":       {"gradle", "test"},
@@ -47,7 +58,6 @@ var installCommands = map[string][]string{
 }
 
 // RunTests runs the test suite for an exercise locally.
-// Automatically installs dependencies first for tracks that need it.
 func (w *Workspace) RunTests(trackSlug, exerciseSlug string) (*TestResult, error) {
 	dir := w.ExerciseDir(trackSlug, exerciseSlug)
 	if _, err := os.Stat(dir); err != nil {
@@ -58,7 +68,6 @@ func (w *Workspace) RunTests(trackSlug, exerciseSlug string) (*TestResult, error
 	if installCmd, ok := installCommands[trackSlug]; ok {
 		trackRoot := filepath.Dir(dir)
 		if _, err := os.Stat(filepath.Join(trackRoot, "node_modules")); err != nil {
-			// Copy package.json to track root if missing
 			pkgSrc := filepath.Join(dir, "package.json")
 			pkgDst := filepath.Join(trackRoot, "package.json")
 			if _, err := os.Stat(pkgDst); err != nil {
@@ -70,8 +79,8 @@ func (w *Workspace) RunTests(trackSlug, exerciseSlug string) (*TestResult, error
 			cmd.Dir = trackRoot
 			if out, err := cmd.CombinedOutput(); err != nil {
 				return &TestResult{
-					Passed: false,
-					Output: fmt.Sprintf("Failed to install dependencies:\n%s", string(out)),
+					Passed:    false,
+					RawOutput: fmt.Sprintf("Failed to install dependencies:\n%s", string(out)),
 				}, nil
 			}
 		}
@@ -84,18 +93,150 @@ func (w *Workspace) RunTests(trackSlug, exerciseSlug string) (*TestResult, error
 
 	cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
 	cmd.Dir = dir
+	output, runErr := cmd.CombinedOutput()
 
-	output, err := cmd.CombinedOutput()
-	passed := err == nil
+	// Try structured parsing for supported runners
+	switch trackSlug {
+	case "javascript", "typescript":
+		if result := parseJestJSON(output); result != nil {
+			return result, nil
+		}
+	case "go":
+		if result := parseGoTestVerbose(string(output), runErr == nil); result != nil {
+			return result, nil
+		}
+	}
 
+	// Fallback: raw output
 	return &TestResult{
-		Passed: passed,
-		Output: string(output),
+		Passed:    runErr == nil,
+		RawOutput: string(output),
 	}, nil
 }
 
+// Jest JSON output parser
+func parseJestJSON(output []byte) *TestResult {
+	// Jest might prefix the JSON with npm/pnpm output lines
+	// Find the JSON object in the output
+	raw := string(output)
+	jsonStart := strings.Index(raw, "{")
+	if jsonStart < 0 {
+		return nil
+	}
+
+	var jest struct {
+		NumPassedTests  int `json:"numPassedTests"`
+		NumFailedTests  int `json:"numFailedTests"`
+		NumTotalTests   int `json:"numTotalTests"`
+		Success         bool `json:"success"`
+		TestResults     []struct {
+			AssertionResults []struct {
+				FullName        string   `json:"fullName"`
+				Status          string   `json:"status"`
+				FailureMessages []string `json:"failureMessages"`
+			} `json:"assertionResults"`
+			// Jest uses both spellings depending on version
+			AssertionResults2 []struct {
+				FullName        string   `json:"fullName"`
+				Status          string   `json:"status"`
+				FailureMessages []string `json:"failureMessages"`
+			} `json:"assertionResults"`
+		} `json:"testResults"`
+	}
+
+	if err := json.Unmarshal([]byte(raw[jsonStart:]), &jest); err != nil {
+		// Try the full output
+		if err := json.Unmarshal(output, &jest); err != nil {
+			return nil
+		}
+	}
+
+	result := &TestResult{
+		Passed:    jest.Success,
+		Total:     jest.NumTotalTests,
+		PassCount: jest.NumPassedTests,
+		FailCount: jest.NumFailedTests,
+	}
+
+	for _, suite := range jest.TestResults {
+		assertions := suite.AssertionResults
+		if len(assertions) == 0 {
+			assertions = suite.AssertionResults2
+		}
+		for _, a := range assertions {
+			tc := TestCase{
+				Name:   a.FullName,
+				Status: a.Status,
+			}
+			if len(a.FailureMessages) > 0 {
+				tc.Message = cleanFailureMessage(a.FailureMessages[0])
+			}
+			result.Cases = append(result.Cases, tc)
+		}
+	}
+
+	return result
+}
+
+// Parse verbose go test output
+func parseGoTestVerbose(output string, passed bool) *TestResult {
+	result := &TestResult{Passed: passed}
+	lines := strings.Split(output, "\n")
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "--- PASS:") {
+			name := strings.TrimPrefix(trimmed, "--- PASS: ")
+			if idx := strings.Index(name, " ("); idx > 0 {
+				name = name[:idx]
+			}
+			result.Cases = append(result.Cases, TestCase{Name: name, Status: "passed"})
+			result.PassCount++
+			result.Total++
+		} else if strings.HasPrefix(trimmed, "--- FAIL:") {
+			name := strings.TrimPrefix(trimmed, "--- FAIL: ")
+			if idx := strings.Index(name, " ("); idx > 0 {
+				name = name[:idx]
+			}
+			result.Cases = append(result.Cases, TestCase{Name: name, Status: "failed"})
+			result.FailCount++
+			result.Total++
+		}
+	}
+
+	if len(result.Cases) == 0 {
+		return nil // couldn't parse, fall back to raw
+	}
+
+	return result
+}
+
+// Clean up jest failure messages — strip ANSI, trim paths, keep the useful part
+func cleanFailureMessage(msg string) string {
+	lines := strings.Split(msg, "\n")
+	var cleaned []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		// Skip lines that are just stack traces to node_modules
+		if strings.Contains(trimmed, "node_modules/") {
+			continue
+		}
+		// Skip lines that are just "at Object.<anonymous>"
+		if strings.HasPrefix(trimmed, "at Object.") || strings.HasPrefix(trimmed, "at new") {
+			continue
+		}
+		cleaned = append(cleaned, trimmed)
+	}
+	if len(cleaned) > 6 {
+		cleaned = cleaned[:6]
+	}
+	return strings.Join(cleaned, "\n")
+}
+
 func resolveTestCommand(trackSlug, dir string) ([]string, error) {
-	// Special case: ruby needs the test file name
 	if trackSlug == "ruby" {
 		testFile, err := findRubyTestFile(dir)
 		if err != nil {
@@ -104,7 +245,6 @@ func resolveTestCommand(trackSlug, dir string) ([]string, error) {
 		return []string{"ruby", testFile}, nil
 	}
 
-	// Special case: bash needs the test file
 	if trackSlug == "bash" {
 		testFile, err := findTestFileByExtension(dir, ".bats")
 		if err != nil {
@@ -122,7 +262,6 @@ func resolveTestCommand(trackSlug, dir string) ([]string, error) {
 }
 
 func findRubyTestFile(dir string) (string, error) {
-	// Check .exercism/config.json for test files
 	configPath := filepath.Join(dir, ".exercism", "config.json")
 	if data, err := os.ReadFile(configPath); err == nil {
 		var config struct {
@@ -134,8 +273,6 @@ func findRubyTestFile(dir string) (string, error) {
 			return config.Files.Test[0], nil
 		}
 	}
-
-	// Fallback: find *_test.rb
 	return findTestFileByPattern(dir, "*_test.rb")
 }
 
