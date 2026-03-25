@@ -161,7 +161,30 @@ func (s *DetailScreen) renderMarkdown(md string) string {
 	if err != nil {
 		return md
 	}
-	return rendered
+	return addCodeBlockBars(rendered)
+}
+
+// addCodeBlockBars post-processes glamour output to inject a subtle left bar
+// on code block lines. Code blocks have Margin: 4 in our style, so they start
+// with 4+ spaces. We replace the 3rd space with a dim colored bar character.
+func addCodeBlockBars(rendered string) string {
+	bar := lipgloss.NewStyle().Foreground(lipgloss.Color("#484848")).Render("│")
+
+	lines := strings.Split(rendered, "\n")
+	for i, line := range lines {
+		// Code block lines start with 4+ spaces (margin=4).
+		// Prose lines start with 2 spaces (margin=2).
+		// We look for lines with at least 4 leading spaces that have content.
+		if len(line) >= 4 && line[:4] == "    " {
+			// Check there's actual content (not just whitespace)
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "" {
+				// Replace the 3rd character (index 2) with the bar
+				lines[i] = line[:2] + bar + line[3:]
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // stripFirstH1 removes the first markdown H1 heading (and any blank lines after it)
