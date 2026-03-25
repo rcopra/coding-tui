@@ -75,16 +75,26 @@ func exercismGlamourStyle() ansi.StyleConfig {
 		},
 	}
 
-	// Code blocks: left-indented with a visible border-like indent token
+	// Code blocks: subtle rounded border using box-drawing characters.
+	// Top/bottom borders via BlockPrefix/Suffix, left bar via IndentToken.
+	// The dim color (#303040) is embedded via ANSI escapes in the strings.
+	borderColor := "\033[38;2;48;48;64m" // dim blue-gray
+	reset := "\033[0m"
+	codeColor := "\033[38;2;238;238;238m" // restore text color after border chars
+
+	topBorder := borderColor + "  ╭───" + reset
+	bottomBorder := borderColor + "  ╰───" + reset
+	leftBar := borderColor + "│" + reset + codeColor + " "
+
 	s.CodeBlock = ansi.StyleCodeBlock{
 		StyleBlock: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
 				Color:       stringPtr("#eeeeee"),
-				BlockPrefix: "\n",
-				BlockSuffix: "\n",
+				BlockPrefix: "\n" + topBorder + "\n",
+				BlockSuffix: bottomBorder + "\n",
 			},
 			Indent:      uintPtr(1),
-			IndentToken: stringPtr("│ "),
+			IndentToken: stringPtr(leftBar),
 			Margin:      uintPtr(2),
 		},
 		Chroma: &ansi.Chroma{
