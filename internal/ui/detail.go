@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
 	"charm.land/lipgloss/v2"
+	xansi "github.com/charmbracelet/x/ansi"
 
 	"github.com/rcopra/coding-tui/internal/api"
 	"github.com/rcopra/coding-tui/internal/workspace"
@@ -165,22 +166,39 @@ func (s *DetailScreen) renderMarkdown(md string) string {
 }
 
 // addCodeBlockBars post-processes glamour output to inject a subtle left bar
-// on code block lines. Code blocks have Margin: 4 in our style, so they start
-// with 4+ spaces. We replace the 3rd space with a dim colored bar character.
+// on code block lines. Code blocks have Margin:4, prose has Margin:2.
+// We detect the difference using ANSI-aware width measurement, then prepend a bar.
 func addCodeBlockBars(rendered string) string {
-	bar := lipgloss.NewStyle().Foreground(lipgloss.Color("#484848")).Render("│")
+	bar := lipgloss.NewStyle().Foreground(lipgloss.Color("#484848")).Render("│") + " "
 
 	lines := strings.Split(rendered, "\n")
 	for i, line := range lines {
-		// Code block lines start with 4+ spaces (margin=4).
-		// Prose lines start with 2 spaces (margin=2).
-		// We look for lines with at least 4 leading spaces that have content.
-		if len(line) >= 4 && line[:4] == "    " {
-			// Check there's actual content (not just whitespace)
-			trimmed := strings.TrimSpace(line)
-			if trimmed != "" {
-				// Replace the 3rd character (index 2) with the bar
-				lines[i] = line[:2] + bar + line[3:]
+		if line == "" {
+			continue
+		}
+		// Strip ANSI to measure visible leading whitespace
+		stripped := xansi.Strip(line)
+		if len(stripped) == 0 {
+			continue
+		}
+
+		// Count leading spaces in the visible (stripped) text
+		leadingSpaces := 0
+		for _, ch := range stripped {
+			if ch == ' ' {
+				leadingSpaces++
+			} else {
+				break
+			}
+		}
+
+		// Code blocks have margin=4 → 4+ leading spaces
+		// Prose has margin=2 → 2 leading spaces
+		// Only mark lines with 4+ leading spaces as code
+		if leadingSpaces >= 4 {
+			// Prepend bar after the initial 2 plain spaces
+			if len(line) >= 2 && line[0] == ' ' && line[1] == ' ' {
+				lines[i] = "  " + bar + line[2:]
 			}
 		}
 	}
