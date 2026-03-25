@@ -36,6 +36,36 @@ var typeIndicator = map[string]string{
 	"practice": "●",
 }
 
+// Sort modes for the exercise list.
+type sortMode int
+
+const (
+	sortDefault sortMode = iota
+	sortDifficulty
+	sortAlphabetical
+	sortType
+	sortModeCount // sentinel for cycling
+)
+
+var sortModeLabel = map[sortMode]string{
+	sortDefault:      "default",
+	sortDifficulty:   "difficulty",
+	sortAlphabetical: "a-z",
+	sortType:         "type",
+}
+
+var difficultyRank = map[string]int{
+	"easy":   0,
+	"medium": 1,
+	"hard":   2,
+}
+
+var typeRank = map[string]int{
+	"tutorial": 0,
+	"concept":  1,
+	"practice": 2,
+}
+
 // exerciseItem adapts api.Exercise for the bubbles list.
 type exerciseItem struct {
 	exercise api.Exercise
@@ -75,6 +105,8 @@ type ExercisesScreen struct {
 	trackSlug string
 	trackName string
 	list      list.Model
+	exercises []api.Exercise
+	sortMode  sortMode
 	loaded    bool
 	err       error
 	width     int
@@ -147,16 +179,9 @@ func (s *ExercisesScreen) SetSize(width, height int) {
 func (s *ExercisesScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case exercisesLoadedMsg:
-		exercises := msg.exercises
-		sort.SliceStable(exercises, func(i, j int) bool {
-			return s.exerciseSortKey(exercises[i]) < s.exerciseSortKey(exercises[j])
-		})
-		items := make([]list.Item, len(exercises))
-		for i, e := range exercises {
-			items[i] = exerciseItem{exercise: e}
-		}
-		cmd := s.list.SetItems(items)
+		s.exercises = msg.exercises
 		s.loaded = true
+		cmd := s.applySort()
 		return s, cmd
 
 	case exercisesErrMsg:
@@ -174,6 +199,13 @@ func (s *ExercisesScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				return s, nil
 			}
 			return s, func() tea.Msg { return PopScreenMsg{} }
+		case "S":
+			if s.loaded {
+				s.sortMode = (s.sortMode + 1) % sortModeCount
+				s.updateTitle()
+				cmd := s.applySort()
+				return s, cmd
+			}
 		case "enter":
 			if s.loaded {
 				if item := s.list.SelectedItem(); item != nil {
@@ -219,10 +251,49 @@ func (s *ExercisesScreen) exerciseSortKey(e api.Exercise) int {
 	}
 }
 
+func (s *ExercisesScreen) applySort() tea.Cmd {
+	sorted := make([]api.Exercise, len(s.exercises))
+	copy(sorted, s.exercises)
+
+	switch s.sortMode {
+	case sortDifficulty:
+		sort.SliceStable(sorted, func(i, j int) bool {
+			return difficultyRank[sorted[i].Difficulty] < difficultyRank[sorted[j].Difficulty]
+		})
+	case sortAlphabetical:
+		sort.SliceStable(sorted, func(i, j int) bool {
+			return sorted[i].Title < sorted[j].Title
+		})
+	case sortType:
+		sort.SliceStable(sorted, func(i, j int) bool {
+			return typeRank[sorted[i].Type] < typeRank[sorted[j].Type]
+		})
+	default:
+		sort.SliceStable(sorted, func(i, j int) bool {
+			return s.exerciseSortKey(sorted[i]) < s.exerciseSortKey(sorted[j])
+		})
+	}
+
+	items := make([]list.Item, len(sorted))
+	for i, e := range sorted {
+		items[i] = exerciseItem{exercise: e}
+	}
+	return s.list.SetItems(items)
+}
+
+func (s *ExercisesScreen) updateTitle() {
+	if s.sortMode == sortDefault {
+		s.list.Title = s.trackName
+	} else {
+		s.list.Title = fmt.Sprintf("%s · %s", s.trackName, sortModeLabel[s.sortMode])
+	}
+}
+
 func (s *ExercisesScreen) ShortHelp() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
 		key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
+		key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "sort")),
 		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
 	}
 }
