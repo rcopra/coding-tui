@@ -68,6 +68,11 @@ func (c *Cache) Set(key string, data any) error {
 	return os.WriteFile(c.path(key), entryData, 0o644)
 }
 
+// Delete removes a cached value.
+func (c *Cache) Delete(key string) {
+	os.Remove(c.path(key))
+}
+
 // GetInto retrieves a cached value and unmarshals it into v.
 // Returns false if cache miss.
 func (c *Cache) GetInto(key string, v any) bool {

@@ -12,12 +12,57 @@ import (
 )
 
 type Workspace struct {
-	root   string
-	client *api.Client
+	root      string
+	client    *api.Client
+	dismissed map[string]bool // track/slug → true
 }
 
 func New(root string, client *api.Client) *Workspace {
-	return &Workspace{root: root, client: client}
+	w := &Workspace{root: root, client: client}
+	w.loadDismissed()
+	return w
+}
+
+func (w *Workspace) dismissedPath() string {
+	return filepath.Join(w.root, ".coding-tui-dismissed.json")
+}
+
+func (w *Workspace) loadDismissed() {
+	w.dismissed = make(map[string]bool)
+	data, err := os.ReadFile(w.dismissedPath())
+	if err != nil {
+		return
+	}
+	var slugs []string
+	if json.Unmarshal(data, &slugs) == nil {
+		for _, s := range slugs {
+			w.dismissed[s] = true
+		}
+	}
+}
+
+func (w *Workspace) saveDismissed() {
+	slugs := make([]string, 0, len(w.dismissed))
+	for s := range w.dismissed {
+		slugs = append(slugs, s)
+	}
+	data, _ := json.Marshal(slugs)
+	_ = os.WriteFile(w.dismissedPath(), data, 0o644)
+}
+
+func (w *Workspace) IsDismissed(trackSlug, exerciseSlug string) bool {
+	return w.dismissed[trackSlug+"/"+exerciseSlug]
+}
+
+func (w *Workspace) ToggleDismiss(trackSlug, exerciseSlug string) bool {
+	key := trackSlug + "/" + exerciseSlug
+	if w.dismissed[key] {
+		delete(w.dismissed, key)
+	} else {
+		w.dismissed[key] = true
+	}
+	w.saveDismissed()
+	return w.dismissed[key]
 }
 
 // ExerciseDir returns the path where an exercise's files live.
@@ -312,6 +357,19 @@ func (w *Workspace) SubmitSolution(trackSlug, exerciseSlug string) error {
 	}
 
 	return w.client.SubmitSolution(meta.ID, files)
+}
+
+// CompleteSolution marks an exercise as complete on Exercism.
+func (w *Workspace) CompleteSolution(trackSlug, exerciseSlug string) error {
+	meta, err := w.ReadMetadata(trackSlug, exerciseSlug)
+	if err != nil {
+		return err
+	}
+	if err := w.client.CompleteSolution(meta.ID); err != nil {
+		return err
+	}
+	w.client.InvalidateExercises(trackSlug)
+	return nil
 }
 
 // SolutionFilePath returns the absolute path to the primary solution file.

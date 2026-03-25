@@ -68,7 +68,8 @@ var typeRank = map[string]int{
 
 // exerciseItem adapts api.Exercise for the bubbles list.
 type exerciseItem struct {
-	exercise api.Exercise
+	exercise  api.Exercise
+	dismissed bool
 }
 
 func (e exerciseItem) Title() string {
@@ -83,13 +84,16 @@ func (e exerciseItem) Title() string {
 		style = subtle
 	}
 
-	title := fmt.Sprintf("%s %s", indicator, e.exercise.Title)
-
-	if !e.exercise.IsUnlocked {
-		title = "🔒 " + e.exercise.Title
+	switch {
+	case !e.exercise.IsUnlocked:
+		return "🔒 " + e.exercise.Title + "  " + style.Render(diff)
+	case e.exercise.Status == "completed":
+		return subtle.Render("✓ "+e.exercise.Title) + "  " + style.Render(diff)
+	case e.dismissed:
+		return subtle.Render("· "+e.exercise.Title) + "  " + style.Render(diff)
+	default:
+		return fmt.Sprintf("%s %s", indicator, e.exercise.Title) + "  " + style.Render(diff)
 	}
-
-	return title + "  " + style.Render(diff)
 }
 
 func (e exerciseItem) Description() string {
@@ -206,6 +210,15 @@ func (s *ExercisesScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				cmd := s.applySort()
 				return s, cmd
 			}
+		case "x":
+			if s.loaded {
+				if item := s.list.SelectedItem(); item != nil {
+					e := item.(exerciseItem)
+					s.workspace.ToggleDismiss(s.trackSlug, e.exercise.Slug)
+					cmd := s.applySort()
+					return s, cmd
+				}
+			}
 		case "enter":
 			if s.loaded {
 				if item := s.list.SelectedItem(); item != nil {
@@ -234,20 +247,24 @@ func (s *ExercisesScreen) View() string {
 
 // exerciseSortKey returns a numeric priority for sorting exercises:
 // 0 = recommended + in progress, 1 = recommended, 2 = in progress,
-// 3 = unlocked, 4 = locked.
+// 3 = unlocked, 4 = completed, 5 = dismissed, 6 = locked.
 func (s *ExercisesScreen) exerciseSortKey(e api.Exercise) int {
 	inProgress := s.workspace.IsDownloaded(s.trackSlug, e.Slug)
 	switch {
+	case s.workspace.IsDismissed(s.trackSlug, e.Slug):
+		return 5
+	case e.Status == "completed":
+		return 4
 	case e.IsRecommended && inProgress:
 		return 0
-	case inProgress:
-		return 1
 	case e.IsRecommended:
+		return 1
+	case inProgress:
 		return 2
 	case e.IsUnlocked:
 		return 3
 	default:
-		return 4
+		return 6
 	}
 }
 
@@ -276,7 +293,10 @@ func (s *ExercisesScreen) applySort() tea.Cmd {
 
 	items := make([]list.Item, len(sorted))
 	for i, e := range sorted {
-		items[i] = exerciseItem{exercise: e}
+		items[i] = exerciseItem{
+			exercise:  e,
+			dismissed: s.workspace.IsDismissed(s.trackSlug, e.Slug),
+		}
 	}
 	return s.list.SetItems(items)
 }
@@ -294,6 +314,7 @@ func (s *ExercisesScreen) ShortHelp() []key.Binding {
 		key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "navigate")),
 		key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "sort")),
+		key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "dismiss")),
 		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
 	}
 }

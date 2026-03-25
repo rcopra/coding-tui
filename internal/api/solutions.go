@@ -72,6 +72,26 @@ func (c *Client) SubmitSolution(solutionID string, files map[string]string) erro
 	return err
 }
 
+// CompleteSolution marks an exercise as complete on Exercism.
+func (c *Client) CompleteSolution(solutionUUID string) error {
+	url := fmt.Sprintf("%s/solutions/%s/complete", websiteAPI, solutionUUID)
+	req, err := http.NewRequest("PATCH", url, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(req)
+	return err
+}
+
+// InvalidateExercises clears the cached exercise list for a track
+// so fresh recommendations are fetched on next load.
+func (c *Client) InvalidateExercises(trackSlug string) {
+	if c.cache != nil {
+		c.cache.Delete(fmt.Sprintf("exercises:%s", trackSlug))
+	}
+}
+
 // SolutionFilePaths returns a map of relative path → absolute path for solution files.
 func SolutionFilePaths(exerciseDir string, solutionFiles []string) map[string]string {
 	files := make(map[string]string)

@@ -31,6 +31,10 @@ type downloadedMsg struct {
 
 type trackNotJoinedMsg struct{}
 
+type completeDoneMsg struct {
+	err error
+}
+
 type detailErrMsg struct {
 	err error
 }
@@ -115,6 +119,11 @@ func (s *DetailScreen) doRunTests() tea.Msg {
 func (s *DetailScreen) doSubmit() tea.Msg {
 	err := s.workspace.SubmitSolution(s.trackSlug, s.exercise.Slug)
 	return submitDoneMsg{err: err}
+}
+
+func (s *DetailScreen) doComplete() tea.Msg {
+	err := s.workspace.CompleteSolution(s.trackSlug, s.exercise.Slug)
+	return completeDoneMsg{err: err}
 }
 
 func (s *DetailScreen) openInNvim(newPane bool) tea.Cmd {
@@ -304,6 +313,7 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 	case testResultMsg:
 		s.running = false
+		s.statusMsg = ""
 		screen := NewTestRunScreen(msg.result)
 		return s, pushScreen(screen)
 
@@ -315,6 +325,18 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		}
 		screen := NewFeedbackScreen(
 			fmt.Sprintf("Solution submitted! View at: https://exercism.org/tracks/%s/exercises/%s", s.trackSlug, s.exercise.Slug),
+			false,
+		)
+		return s, pushScreen(screen)
+
+	case completeDoneMsg:
+		s.running = false
+		if msg.err != nil {
+			s.statusMsg = fmt.Sprintf("Complete failed: %v", msg.err)
+			return s, nil
+		}
+		screen := NewFeedbackScreen(
+			fmt.Sprintf("Exercise completed! https://exercism.org/tracks/%s/exercises/%s", s.trackSlug, s.exercise.Slug),
 			false,
 		)
 		return s, pushScreen(screen)
@@ -365,6 +387,14 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			s.running = true
 			s.statusMsg = "Submitting..."
 			return s, s.doSubmit
+		case "C":
+			if !s.downloaded {
+				s.statusMsg = "Download the exercise first (d)"
+				return s, nil
+			}
+			s.running = true
+			s.statusMsg = "Marking complete..."
+			return s, s.doComplete
 		case "e":
 			return s, s.openInNvim(false)
 		case "E":
@@ -444,6 +474,7 @@ func (s *DetailScreen) ShortHelp() []key.Binding {
 			key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "nvim (new pane)")),
 			key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "test")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "submit")),
+			key.NewBinding(key.WithKeys("C"), key.WithHelp("C", "complete")),
 		)
 	}
 	bindings = append(bindings,

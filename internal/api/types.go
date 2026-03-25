@@ -37,11 +37,20 @@ type Exercise struct {
 	IsExternal    bool   `json:"is_external"`
 	IsUnlocked    bool   `json:"is_unlocked"`
 	IsRecommended bool   `json:"is_recommended"`
+	Status        string `json:"-"` // populated from sideloaded solutions: "", "started", "completed"
 	Links         Links  `json:"links"`
 }
 
 type ExercisesResponse struct {
-	Exercises []Exercise `json:"exercises"`
+	Exercises []Exercise     `json:"exercises"`
+	Solutions []UserSolution `json:"solutions"`
+}
+
+type UserSolution struct {
+	Status   string `json:"status"` // "started", "completed", "published"
+	Exercise struct {
+		Slug string `json:"slug"`
+	} `json:"exercise"`
 }
 
 type CommunitySolution struct {

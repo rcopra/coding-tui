@@ -21,17 +21,21 @@ type submitDoneMsg struct {
 	err error
 }
 
-// Styles for test display
+// Styles — uses the OpenCode palette from theme.go.
+// Three semantic tiers: pass (green), fail (red), secondary (dim).
 var (
-	passIcon = lipgloss.NewStyle().Foreground(green).Bold(true).Render("✓")
-	failIcon = lipgloss.NewStyle().Foreground(red).Bold(true).Render("✗")
-	passText = lipgloss.NewStyle().Foreground(green)
-	failText = lipgloss.NewStyle().Foreground(red)
-	dimText  = lipgloss.NewStyle().Foreground(dim)
-	errText  = lipgloss.NewStyle().Foreground(red).Faint(true)
-	barPass  = lipgloss.NewStyle().Background(green).Foreground(lipgloss.Color("#000000"))
-	barFail  = lipgloss.NewStyle().Background(red).Foreground(lipgloss.Color("#000000"))
-	barDim   = lipgloss.NewStyle().Background(lipgloss.Color("#1e1e1e"))
+	tPass = lipgloss.NewStyle().Foreground(green)
+	tFail = lipgloss.NewStyle().Foreground(red)
+	tDim  = lipgloss.NewStyle().Foreground(dim)
+	tBody = lipgloss.NewStyle().Foreground(white)
+	tHead = lipgloss.NewStyle().Foreground(accent).Bold(true)
+
+	tBarPass = lipgloss.NewStyle().Background(green).Foreground(lipgloss.Color("#000000"))
+	tBarFail = lipgloss.NewStyle().Background(red).Foreground(lipgloss.Color("#000000"))
+	tBarDim  = lipgloss.NewStyle().Background(faint)
+
+	// Highlighted failing line — full-width bg like a pager/editor
+	tHlBg = lipgloss.Color("#1a1a2e")
 )
 
 // TestRunScreen displays test output.
@@ -53,57 +57,24 @@ func NewTestRunScreen(result *workspace.TestResult) *TestRunScreen {
 }
 
 func (s *TestRunScreen) Init() tea.Cmd {
-	s.viewport.SetContent(s.formatOutput())
+	s.viewport.SetContent(s.render())
 	return nil
 }
 
-func (s *TestRunScreen) formatOutput() string {
+// ── Structured output (parsed test cases) ──────────────────────────
+
+func (s *TestRunScreen) render() string {
 	r := s.result
-	var b strings.Builder
-
-	// If we only have raw output, show it nicely
 	if len(r.Cases) == 0 {
-		return s.formatRawOutput()
+		return s.renderRaw()
 	}
 
-	// Summary header
-	b.WriteString("\n")
-	if r.Passed {
-		b.WriteString("  " + passIcon + lipgloss.NewStyle().Bold(true).Foreground(green).Render("  ALL TESTS PASSED"))
-	} else {
-		b.WriteString("  " + failIcon + lipgloss.NewStyle().Bold(true).Foreground(red).Render("  TESTS FAILED"))
-	}
-	b.WriteString("\n\n")
+	var sections []string
 
-	// Progress bar
-	b.WriteString(s.renderProgressBar())
-	b.WriteString("\n\n")
+	// 1. Summary box — bordered, contains status + bar + stats
+	sections = append(sections, s.renderSummaryBox())
 
-	// Stats line
-	stats := fmt.Sprintf("  %d passed", r.PassCount)
-	if r.FailCount > 0 {
-		stats += fmt.Sprintf("  %d failed", r.FailCount)
-	}
-	stats += fmt.Sprintf("  %d total", r.Total)
-
-	statsStyled := "  "
-	if r.PassCount > 0 {
-		statsStyled += passText.Render(fmt.Sprintf("%d passed", r.PassCount))
-	}
-	if r.FailCount > 0 {
-		if r.PassCount > 0 {
-			statsStyled += dimText.Render("  ·  ")
-		}
-		statsStyled += failText.Render(fmt.Sprintf("%d failed", r.FailCount))
-	}
-	statsStyled += dimText.Render(fmt.Sprintf("  ·  %d total", r.Total))
-	b.WriteString(statsStyled)
-	b.WriteString("\n")
-
-	// Separator
-	b.WriteString("\n")
-
-	// Individual test cases — failures first
+	// 2. Failures — expanded with error detail
 	var failures, passes []workspace.TestCase
 	for _, tc := range r.Cases {
 		if tc.Status == "failed" {
@@ -113,32 +84,127 @@ func (s *TestRunScreen) formatOutput() string {
 		}
 	}
 
-	// Show failures
 	if len(failures) > 0 {
-		b.WriteString(failText.Bold(true).Render("  Failures"))
-		b.WriteString("\n\n")
-		for _, tc := range failures {
-			b.WriteString("  " + failIcon + "  " + lipgloss.NewStyle().Foreground(white).Render(tc.Name))
-			b.WriteString("\n")
-			if tc.Message != "" {
-				for _, line := range strings.Split(tc.Message, "\n") {
-					b.WriteString("     " + errText.Render(line))
-					b.WriteString("\n")
-				}
-			}
-			b.WriteString("\n")
-		}
+		sections = append(sections, s.renderFailures(failures))
 	}
 
-	// Show passes
+	// 3. Passes — tight compact list
 	if len(passes) > 0 {
-		if len(failures) > 0 {
-			b.WriteString("\n")
+		sections = append(sections, s.renderPasses(passes))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+func (s *TestRunScreen) renderSummaryBox() string {
+	r := s.result
+	var lines []string
+
+	// Status line
+	if r.Passed {
+		icon := tPass.Bold(true).Render("✓")
+		label := tPass.Bold(true).Render("ALL TESTS PASSED")
+		lines = append(lines, icon+"  "+label)
+	} else {
+		icon := tFail.Bold(true).Render("✗")
+		label := tFail.Bold(true).Render("TESTS FAILED")
+		lines = append(lines, icon+"  "+label)
+	}
+
+	// Progress bar
+	bar := s.renderBar()
+	if bar != "" {
+		lines = append(lines, "")
+		lines = append(lines, bar)
+	}
+
+	// Stats
+	var stats []string
+	if r.PassCount > 0 {
+		stats = append(stats, tPass.Render(fmt.Sprintf("%d passed", r.PassCount)))
+	}
+	if r.FailCount > 0 {
+		stats = append(stats, tFail.Render(fmt.Sprintf("%d failed", r.FailCount)))
+	}
+	stats = append(stats, tDim.Render(fmt.Sprintf("%d total", r.Total)))
+	lines = append(lines, strings.Join(stats, tDim.Render("  ·  ")))
+
+	content := strings.Join(lines, "\n")
+
+	boxWidth := s.width - 6
+	if boxWidth < 30 {
+		boxWidth = 30
+	}
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#333333")).
+		Padding(1, 2).
+		Width(boxWidth).
+		Render(content)
+
+	return "\n" + "  " + box + "\n"
+}
+
+func (s *TestRunScreen) renderBar() string {
+	r := s.result
+	if r.Total == 0 {
+		return ""
+	}
+
+	barWidth := s.width - 12
+	if barWidth < 10 {
+		barWidth = 10
+	}
+	if barWidth > 50 {
+		barWidth = 50
+	}
+
+	passW := barWidth * r.PassCount / r.Total
+	failW := barWidth * r.FailCount / r.Total
+	if r.PassCount > 0 && passW == 0 {
+		passW = 1
+	}
+	if r.FailCount > 0 && failW == 0 {
+		failW = 1
+	}
+	emptyW := barWidth - passW - failW
+	if emptyW < 0 {
+		emptyW = 0
+	}
+
+	var bar string
+	if passW > 0 {
+		bar += tBarPass.Render(strings.Repeat("━", passW))
+	}
+	if failW > 0 {
+		bar += tBarFail.Render(strings.Repeat("━", failW))
+	}
+	if emptyW > 0 {
+		bar += tBarDim.Render(strings.Repeat("━", emptyW))
+	}
+	return bar
+}
+
+func (s *TestRunScreen) renderFailures(failures []workspace.TestCase) string {
+	var b strings.Builder
+
+	b.WriteString("  " + tHead.Render("Failures"))
+	b.WriteString("\n\n")
+
+	for i, tc := range failures {
+		// Icon carries the semantic color; name stays neutral/bright
+		icon := tFail.Bold(true).Render("✗")
+		name := tBody.Render(tc.Name)
+		b.WriteString("    " + icon + "  " + name + "\n")
+
+		if tc.Message != "" {
+			for _, line := range strings.Split(tc.Message, "\n") {
+				b.WriteString("       " + tDim.Render(line) + "\n")
+			}
 		}
-		b.WriteString(passText.Bold(true).Render("  Passed"))
-		b.WriteString("\n\n")
-		for _, tc := range passes {
-			b.WriteString("  " + passIcon + "  " + dimText.Render(tc.Name))
+
+		if i < len(failures)-1 {
 			b.WriteString("\n")
 		}
 	}
@@ -146,114 +212,121 @@ func (s *TestRunScreen) formatOutput() string {
 	return b.String()
 }
 
-func (s *TestRunScreen) renderProgressBar() string {
-	r := s.result
-	if r.Total == 0 {
-		return ""
-	}
-
-	barWidth := s.width - 6
-	if barWidth < 10 {
-		barWidth = 10
-	}
-	if barWidth > 60 {
-		barWidth = 60
-	}
-
-	passWidth := barWidth * r.PassCount / r.Total
-	failWidth := barWidth * r.FailCount / r.Total
-	// Ensure at least 1 char for non-zero counts
-	if r.PassCount > 0 && passWidth == 0 {
-		passWidth = 1
-	}
-	if r.FailCount > 0 && failWidth == 0 {
-		failWidth = 1
-	}
-	emptyWidth := barWidth - passWidth - failWidth
-	if emptyWidth < 0 {
-		emptyWidth = 0
-	}
-
-	bar := "  "
-	if passWidth > 0 {
-		bar += barPass.Render(strings.Repeat("━", passWidth))
-	}
-	if failWidth > 0 {
-		bar += barFail.Render(strings.Repeat("━", failWidth))
-	}
-	if emptyWidth > 0 {
-		bar += barDim.Render(strings.Repeat("━", emptyWidth))
-	}
-
-	return bar
-}
-
-func (s *TestRunScreen) formatRawOutput() string {
+func (s *TestRunScreen) renderPasses(passes []workspace.TestCase) string {
 	var b strings.Builder
 
-	b.WriteString("\n")
-	if s.result.Passed {
-		b.WriteString("  " + passIcon + lipgloss.NewStyle().Bold(true).Foreground(green).Render("  TESTS PASSED"))
-	} else {
-		b.WriteString("  " + failIcon + lipgloss.NewStyle().Bold(true).Foreground(red).Render("  TESTS FAILED"))
-	}
+	b.WriteString("\n  " + tHead.Render("Passed"))
 	b.WriteString("\n\n")
 
-	// Colorize raw output lines
-	for _, line := range strings.Split(s.result.RawOutput, "\n") {
+	// Tight list — no blank lines between passes
+	for _, tc := range passes {
+		icon := tPass.Render("✓")
+		name := tDim.Render(tc.Name)
+		b.WriteString("    " + icon + "  " + name + "\n")
+	}
+
+	return b.String()
+}
+
+// ── Raw output fallback ────────────────────────────────────────────
+// Three color tiers only: fail lines, pass lines, everything else (dim).
+// The failing code line gets a background highlight like a pager.
+
+func (s *TestRunScreen) renderRaw() string {
+	var b strings.Builder
+
+	// Header with breathing room
+	b.WriteString("\n")
+	if s.result.Passed {
+		icon := tPass.Bold(true).Render("✓")
+		label := tPass.Bold(true).Render("ALL TESTS PASSED")
+		b.WriteString("    " + icon + "  " + label)
+	} else {
+		icon := tFail.Bold(true).Render("✗")
+		label := tFail.Bold(true).Render("TESTS FAILED")
+		b.WriteString("    " + icon + "  " + label)
+	}
+	b.WriteString("\n")
+	sep := tDim.Render(strings.Repeat("─", 40))
+	b.WriteString("    " + sep)
+	b.WriteString("\n\n")
+
+	hlStyle := lipgloss.NewStyle().Foreground(white).Background(tHlBg).Bold(true)
+	caretStyle := lipgloss.NewStyle().Foreground(red).Background(tHlBg)
+	descStyle := lipgloss.NewStyle().Foreground(yellow).Bold(true)
+
+	lines := strings.Split(s.result.RawOutput, "\n")
+	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		styled := "  " + line
+		var styled string
 
 		switch {
-		// Failed test lines: × ✕ ✗ ✘ markers (Jest uses ×)
-		case strings.Contains(trimmed, "×") || strings.Contains(trimmed, "✕") ||
-			strings.Contains(trimmed, "✗") || strings.Contains(trimmed, "✘"):
-			styled = "  " + failText.Render(line)
-		// Passed test lines: ✓ ✔ markers
-		case strings.Contains(trimmed, "✓") || strings.Contains(trimmed, "✔"):
-			styled = "  " + passText.Render(line)
-		// Failure detail headers: ● marker
-		case strings.HasPrefix(trimmed, "●"):
-			styled = "  " + lipgloss.NewStyle().Foreground(red).Bold(true).Render(line)
-		// PASS/ok lines
-		case strings.HasPrefix(trimmed, "PASS") || strings.HasPrefix(trimmed, "ok ") ||
-			strings.Contains(trimmed, "0 failures"):
-			styled = "  " + passText.Render(line)
-		// FAIL lines
+		// ── FAIL file line (must be before describe block check) ──
 		case strings.HasPrefix(trimmed, "FAIL"):
-			styled = "  " + failText.Render(line)
-		// Expected values
-		case strings.HasPrefix(trimmed, "Expected:"):
-			styled = "  " + passText.Render(line)
-		// Received values
-		case strings.HasPrefix(trimmed, "Received:"):
-			styled = "  " + failText.Render(line)
-		// Code pointer lines (> 11 |  code)
+			styled = "    " + tFail.Render(trimmed)
+
+		// ── Fail-tier: red (× markers) ──
+		case isFailLine(trimmed):
+			styled = "      " + tFail.Render(trimmed)
+
+		// ── Pass-tier: green (✓ markers) ──
+		case isPassLine(trimmed):
+			styled = "      " + tPass.Render(trimmed)
+
+		// ── Describe block names (section headers in test tree) ──
+		// Identifiers like EXPECTED_MINUTES_IN_OVEN, remainingMinutesInOven
+		case isDescribeBlock(trimmed):
+			if i > 0 {
+				prev := strings.TrimSpace(lines[i-1])
+				if prev != "" && !strings.HasPrefix(prev, "FAIL") {
+					b.WriteString("\n")
+				}
+			}
+			styled = "    " + descStyle.Render(trimmed)
+
+		// ── Failure detail header (● marker) ──
+		case strings.HasPrefix(trimmed, "●"):
+			styled = "\n    " + tFail.Bold(true).Render(trimmed)
+
+		// ── Failing code line (> NN |) — pager highlight ──
 		case strings.HasPrefix(trimmed, ">") && strings.Contains(trimmed, "|"):
-			styled = "  " + lipgloss.NewStyle().Foreground(yellow).Render(line)
-		// Line number context (  12 |  })
-		case len(trimmed) > 0 && trimmed[0] >= '0' && trimmed[0] <= '9' && strings.Contains(trimmed, "|"):
-			styled = "  " + dimText.Render(line)
-		// Caret pointer line (  |  ^)
-		case strings.Contains(trimmed, "|") && strings.Contains(trimmed, "^") &&
-			strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(trimmed, "|", ""), "^", "")) == "":
-			styled = "  " + failText.Render(line)
-		// Stack trace / location lines
-		case strings.HasPrefix(trimmed, "at "):
-			styled = "  " + dimText.Render(line)
-		// Assertion descriptions (expect().toBe(), etc.)
-		case strings.Contains(trimmed, "expect(") && strings.Contains(trimmed, "//"):
-			styled = "  " + dimText.Render(line)
-		// General error/fail keywords
-		case strings.Contains(trimmed, "Error") || strings.Contains(trimmed, "error") ||
-			strings.Contains(trimmed, "failed"):
-			styled = "  " + failText.Render(line)
-		case strings.Contains(trimmed, "passed"):
-			styled = "  " + passText.Render(line)
-		// Comments and separators
-		case strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "---") ||
-			strings.HasPrefix(trimmed, "//"):
-			styled = "  " + dimText.Render(line)
+			content := "      " + trimmed
+			if s.width > 0 {
+				pad := s.width - 6 - len(trimmed)
+				if pad > 0 {
+					content += strings.Repeat(" ", pad)
+				}
+			}
+			styled = hlStyle.Render(content)
+
+		// ── Caret line (  |  ^) — connect to highlight ──
+		case isCaret(trimmed):
+			content := "      " + trimmed
+			if s.width > 0 {
+				pad := s.width - 6 - len(trimmed)
+				if pad > 0 {
+					content += strings.Repeat(" ", pad)
+				}
+			}
+			styled = caretStyle.Render(content)
+
+		// ── Expected/Received labels ──
+		case strings.HasPrefix(trimmed, "Expected:"):
+			styled = "      " + tBody.Render(trimmed)
+		case strings.HasPrefix(trimmed, "Received:"):
+			styled = "      " + tFail.Render(trimmed)
+
+		// ── Code context lines (NN |) — normal weight, not dimmed ──
+		case isCodeContext(trimmed):
+			styled = "      " + tBody.Render(trimmed)
+
+		// ── Empty lines ──
+		case trimmed == "":
+			styled = ""
+
+		// ── Everything else — subtle but readable ──
+		default:
+			styled = "      " + tDim.Render(trimmed)
 		}
 
 		b.WriteString(styled + "\n")
@@ -262,14 +335,74 @@ func (s *TestRunScreen) formatRawOutput() string {
 	return b.String()
 }
 
+// ── Line classification helpers ────────────────────────────────────
+
+func isFailLine(s string) bool {
+	if strings.HasPrefix(s, "FAIL") {
+		return true
+	}
+	// Jest uses × (U+00D7), also handle ✕ ✗ ✘
+	for _, mark := range []string{"×", "✕", "✗", "✘"} {
+		if strings.Contains(s, mark) {
+			return true
+		}
+	}
+	return false
+}
+
+func isPassLine(s string) bool {
+	if strings.HasPrefix(s, "PASS") || strings.HasPrefix(s, "ok ") {
+		return true
+	}
+	for _, mark := range []string{"✓", "✔"} {
+		if strings.Contains(s, mark) {
+			return true
+		}
+	}
+	return false
+}
+
+func isCodeContext(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	return s[0] >= '0' && s[0] <= '9' && strings.Contains(s, "|")
+}
+
+// isDescribeBlock detects Jest describe/context group names in raw output.
+// These are identifiers (camelCase, PascalCase, SCREAMING_SNAKE) that don't
+// match any other pattern — they're section headers in the test tree.
+func isDescribeBlock(s string) bool {
+	if len(s) == 0 || len(s) > 80 {
+		return false
+	}
+	// Must be word characters only (letters, digits, underscores)
+	for _, r := range s {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func isCaret(s string) bool {
+	if !strings.Contains(s, "^") {
+		return false
+	}
+	cleaned := strings.ReplaceAll(strings.ReplaceAll(s, "|", ""), "^", "")
+	return strings.TrimSpace(cleaned) == ""
+}
+
+// ── Viewport plumbing ──────────────────────────────────────────────
+
 func (s *TestRunScreen) SetSize(width, height int) {
 	s.width = width
 	s.height = height
 	s.viewport.SetWidth(width)
 	s.viewport.SetHeight(height)
-	// Re-render if we have content (progress bar depends on width)
 	if s.result != nil {
-		s.viewport.SetContent(s.formatOutput())
+		s.viewport.SetContent(s.render())
 	}
 }
 
@@ -297,7 +430,8 @@ func (s *TestRunScreen) ShortHelp() []key.Binding {
 	}
 }
 
-// Feedback screen for showing submission result
+// ── Feedback screen (submission result) ────────────────────────────
+
 type FeedbackScreen struct {
 	viewport viewport.Model
 	message  string
@@ -323,7 +457,7 @@ func (s *FeedbackScreen) Init() tea.Cmd {
 		styled = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(green).
-			Render("  ✓ "+s.message)
+			Render("  ✓ " + s.message)
 	}
 	s.viewport.SetContent(styled)
 	return nil
