@@ -53,8 +53,10 @@ type DetailScreen struct {
 	downloaded   bool
 	downloadDir  string
 	loading      bool
-	running      bool // test or submit in progress
-	err          error
+	running        bool // test or submit in progress
+	confirmSubmit  bool // waiting for second 's' to confirm
+	confirmComplete bool // waiting for second 'C' to confirm
+	err            error
 	statusMsg    string
 	width        int
 	height       int
@@ -312,7 +314,17 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		if s.running {
 			return s, nil // ignore keys while running
 		}
-		switch msg.String() {
+		// Cancel pending confirmation on any key that isn't the confirm key
+		k := msg.String()
+		if k != "s" && s.confirmSubmit {
+			s.confirmSubmit = false
+			s.statusMsg = ""
+		}
+		if k != "C" && s.confirmComplete {
+			s.confirmComplete = false
+			s.statusMsg = ""
+		}
+		switch k {
 		case "q", "esc":
 			return s, func() tea.Msg { return PopScreenMsg{} }
 		case "d":
@@ -345,17 +357,31 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				s.statusMsg = "Download the exercise first (d)"
 				return s, nil
 			}
-			s.running = true
-			s.statusMsg = "Submitting..."
-			return s, s.doSubmit
+			if s.confirmSubmit {
+				s.confirmSubmit = false
+				s.running = true
+				s.statusMsg = "Submitting..."
+				return s, s.doSubmit
+			}
+			s.confirmSubmit = true
+			s.confirmComplete = false
+			s.statusMsg = "Press s again to submit, any other key to cancel"
+			return s, nil
 		case "C":
 			if !s.downloaded {
 				s.statusMsg = "Download the exercise first (d)"
 				return s, nil
 			}
-			s.running = true
-			s.statusMsg = "Marking complete..."
-			return s, s.doComplete
+			if s.confirmComplete {
+				s.confirmComplete = false
+				s.running = true
+				s.statusMsg = "Marking complete..."
+				return s, s.doComplete
+			}
+			s.confirmComplete = true
+			s.confirmSubmit = false
+			s.statusMsg = "Press C again to mark complete, any other key to cancel"
+			return s, nil
 		case "e":
 			return s, s.openInNvim(false)
 		case "E":

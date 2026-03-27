@@ -30,12 +30,9 @@ var difficultyStyle = map[string]lipgloss.Style{
 	"hard":   lipgloss.NewStyle().Foreground(red),
 }
 
-// Exercise type indicators
-var typeIndicator = map[string]string{
-	"tutorial": "★",
-	"concept":  "◆",
-	"practice": "●",
-}
+// Indicator styles for concept (learning) and recommended exercises.
+var conceptStyle = lipgloss.NewStyle().Foreground(yellow)
+var recommendedStyle = lipgloss.NewStyle().Foreground(blue)
 
 // Sort modes for the exercise list.
 type sortMode int
@@ -74,11 +71,6 @@ type exerciseItem struct {
 }
 
 func (e exerciseItem) Title() string {
-	indicator := typeIndicator[e.exercise.Type]
-	if indicator == "" {
-		indicator = "●"
-	}
-
 	diff := e.exercise.Difficulty
 	style, ok := difficultyStyle[diff]
 	if !ok {
@@ -92,8 +84,12 @@ func (e exerciseItem) Title() string {
 		return subtle.Render("✓ "+e.exercise.Title) + "  " + style.Render(diff)
 	case e.dismissed:
 		return subtle.Render("· "+e.exercise.Title) + "  " + style.Render(diff)
+	case e.exercise.Type == "concept":
+		return conceptStyle.Render("💡") + " " + e.exercise.Title + "  " + style.Render(diff)
+	case e.exercise.IsRecommended:
+		return recommendedStyle.Render("▸") + " " + e.exercise.Title + "  " + style.Render(diff)
 	default:
-		return fmt.Sprintf("%s %s", indicator, e.exercise.Title) + "  " + style.Render(diff)
+		return "● " + e.exercise.Title + "  " + style.Render(diff)
 	}
 }
 
@@ -179,7 +175,7 @@ func (s *ExercisesScreen) fetchExercises() tea.Msg {
 func (s *ExercisesScreen) SetSize(width, height int) {
 	s.width = width
 	s.height = height
-	s.list.SetSize(width, height)
+	s.list.SetSize(width, height-1) // reserve 1 line for legend
 }
 
 func (s *ExercisesScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
@@ -254,7 +250,8 @@ func (s *ExercisesScreen) View() string {
 	if s.showHelp {
 		return s.renderHelp()
 	}
-	return s.list.View()
+	legend := "  " + conceptStyle.Render("💡") + " learning  " + recommendedStyle.Render("▸") + " recommended  ● available  " + subtle.Render("✓ completed  · dismissed")
+	return s.list.View() + "\n" + legend
 }
 
 func (s *ExercisesScreen) renderHelp() string {
@@ -284,7 +281,7 @@ func (s *ExercisesScreen) renderHelp() string {
 	b.WriteString("\n")
 	b.WriteString(subtle.Render("  Sort modes: default · difficulty · a-z · type") + "\n")
 	b.WriteString("\n")
-	b.WriteString(subtle.Render("  ● practice  ◆ concept  ★ tutorial  ✓ completed  · dismissed"))
+	b.WriteString("  " + conceptStyle.Render("💡") + " learning  " + recommendedStyle.Render("▸") + " recommended  ● available  " + subtle.Render("✓ completed  · dismissed"))
 
 	return b.String()
 }
