@@ -275,7 +275,7 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	case testResultMsg:
 		s.running = false
 		s.statusMsg = ""
-		screen := NewTestRunScreen(msg.result)
+		screen := NewTestRunScreen(msg.result, s.workspace, s.trackSlug, s.exercise.Slug)
 		return s, pushScreen(screen)
 
 	case submitDoneMsg:

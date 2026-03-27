@@ -40,19 +40,26 @@ var (
 
 // TestRunScreen displays test output.
 type TestRunScreen struct {
-	viewport viewport.Model
-	result   *workspace.TestResult
-	width    int
-	height   int
+	viewport  viewport.Model
+	result    *workspace.TestResult
+	ws        *workspace.Workspace
+	trackSlug string
+	exSlug    string
+	running   bool
+	width     int
+	height    int
 }
 
-func NewTestRunScreen(result *workspace.TestResult) *TestRunScreen {
+func NewTestRunScreen(result *workspace.TestResult, ws *workspace.Workspace, trackSlug, exSlug string) *TestRunScreen {
 	vp := viewport.New()
 	vp.KeyMap.HalfPageDown.SetEnabled(false)
 	vp.KeyMap.HalfPageUp.SetEnabled(false)
 	return &TestRunScreen{
-		viewport: vp,
-		result:   result,
+		viewport:  vp,
+		result:    result,
+		ws:        ws,
+		trackSlug: trackSlug,
+		exSlug:    exSlug,
 	}
 }
 
@@ -61,9 +68,20 @@ func (s *TestRunScreen) Init() tea.Cmd {
 	return nil
 }
 
+func (s *TestRunScreen) doRunTests() tea.Msg {
+	result, err := s.ws.RunTests(s.trackSlug, s.exSlug)
+	if err != nil {
+		return testResultMsg{result: &workspace.TestResult{RawOutput: err.Error()}}
+	}
+	return testResultMsg{result: result}
+}
+
 // ── Structured output (parsed test cases) ──────────────────────────
 
 func (s *TestRunScreen) render() string {
+	if s.running {
+		return "\n    " + tDim.Render("Running tests...")
+	}
 	r := s.result
 	if len(r.Cases) == 0 {
 		return s.renderRaw()
@@ -408,10 +426,24 @@ func (s *TestRunScreen) SetSize(width, height int) {
 
 func (s *TestRunScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
+	case testResultMsg:
+		s.running = false
+		s.result = msg.result
+		s.viewport.SetContent(s.render())
+		s.viewport.GotoTop()
+		return s, nil
+
 	case tea.KeyPressMsg:
+		if s.running {
+			return s, nil
+		}
 		switch msg.String() {
 		case "q", "esc":
 			return s, func() tea.Msg { return PopScreenMsg{} }
+		case "t":
+			s.running = true
+			s.viewport.SetContent(s.render())
+			return s, s.doRunTests
 		}
 	}
 
@@ -427,6 +459,7 @@ func (s *TestRunScreen) View() string {
 func (s *TestRunScreen) ShortHelp() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "scroll")),
+		key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "re-run")),
 	}
 }
 
