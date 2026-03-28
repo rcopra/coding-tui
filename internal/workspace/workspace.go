@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rcopra/coding-tui/internal/api"
+	"github.com/rcopra/gym/internal/api"
 )
 
 type Workspace struct {

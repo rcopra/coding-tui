@@ -8,11 +8,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/rcopra/coding-tui/internal/api"
-	"github.com/rcopra/coding-tui/internal/cache"
-	"github.com/rcopra/coding-tui/internal/config"
-	"github.com/rcopra/coding-tui/internal/ui"
-	"github.com/rcopra/coding-tui/internal/workspace"
+	"github.com/rcopra/gym/internal/api"
+	"github.com/rcopra/gym/internal/cache"
+	"github.com/rcopra/gym/internal/config"
+	"github.com/rcopra/gym/internal/ui"
+	"github.com/rcopra/gym/internal/workspace"
 )
 
 func main() {
@@ -22,6 +22,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	gymCfg := config.LoadGym()
+	ui.SetGlamourStyle(gymCfg.Style)
+
 	cacheDir := filepath.Join(cacheBaseDir(), "coding-tui")
 	c := cache.New(cacheDir, 10*time.Minute)
 
@@ -30,13 +33,8 @@ func main() {
 	tracks := ui.NewTracksScreen(client, ws)
 	root := ui.NewRoot(tracks)
 
-	// Set terminal background to true black while the TUI runs
-	fmt.Print("\033]11;#0a0a0a\a")
-	defer fmt.Print("\033]111\a") // reset to terminal default on exit
-
 	p := tea.NewProgram(root)
 	if _, err := p.Run(); err != nil {
-		fmt.Print("\033]111\a") // reset bg on error too
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

@@ -7,10 +7,18 @@ import (
 	"path/filepath"
 )
 
+// Config holds the exercism API configuration (from exercism CLI's user.json).
 type Config struct {
 	APIBaseURL string `json:"apibaseurl"`
 	Token      string `json:"token"`
 	Workspace  string `json:"workspace"`
+}
+
+// GymConfig holds gym-specific settings (from ~/.config/gym/config.json).
+type GymConfig struct {
+	// Style is a glamour style name ("dark", "light", "dracula", "tokyo-night", "pink")
+	// or a path to a custom JSON style file.
+	Style string `json:"style"`
 }
 
 func Load() (*Config, error) {
@@ -30,6 +38,24 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// LoadGym loads gym-specific config from ~/.config/gym/config.json.
+// Returns defaults if the file doesn't exist.
+func LoadGym() *GymConfig {
+	path := filepath.Join(configDir(), "gym", "config.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return &GymConfig{Style: "dark"}
+	}
+	var gc GymConfig
+	if err := json.Unmarshal(data, &gc); err != nil {
+		return &GymConfig{Style: "dark"}
+	}
+	if gc.Style == "" {
+		gc.Style = "dark"
+	}
+	return &gc
 }
 
 func configDir() string {

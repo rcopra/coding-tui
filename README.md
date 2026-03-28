@@ -26,13 +26,13 @@ Designed to run in a tmux pane alongside your editor. The filesystem is the brid
 ## Install
 
 ```sh
-go install github.com/rcopra/coding-tui@latest
+go install github.com/rcopra/gym@latest
 ```
 
 Or build from source:
 
 ```sh
-git clone https://github.com/rcopra/coding-tui.git
+git clone https://github.com/rcopra/gym.git
 cd coding-tui
 go build -o coding-tui .
 ```

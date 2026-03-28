@@ -10,10 +10,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
 	"charm.land/lipgloss/v2"
-	xansi "github.com/charmbracelet/x/ansi"
 
-	"github.com/rcopra/coding-tui/internal/api"
-	"github.com/rcopra/coding-tui/internal/workspace"
+	"github.com/rcopra/gym/internal/api"
+	"github.com/rcopra/gym/internal/workspace"
 )
 
 // Messages
@@ -64,9 +63,12 @@ type DetailScreen struct {
 
 func NewDetailScreen(client *api.Client, ws *workspace.Workspace, exercise api.Exercise, trackSlug string) *DetailScreen {
 	vp := viewport.New()
-	// Disable d/u half-page bindings — d conflicts with download, u is unexpected
-	vp.KeyMap.HalfPageDown.SetEnabled(false)
-	vp.KeyMap.HalfPageUp.SetEnabled(false)
+	// Remap half-page to ctrl+d/ctrl+u (plain d conflicts with download)
+	vp.KeyMap.HalfPageDown = key.NewBinding(key.WithKeys("ctrl+d"))
+	vp.KeyMap.HalfPageUp = key.NewBinding(key.WithKeys("ctrl+u"))
+	// Disable h/l left/right scroll (h conflicts with hints, not useful for markdown)
+	vp.KeyMap.Left.SetEnabled(false)
+	vp.KeyMap.Right.SetEnabled(false)
 
 	return &DetailScreen{
 		client:     client,
@@ -128,7 +130,7 @@ func (s *DetailScreen) doComplete() tea.Msg {
 	return completeDoneMsg{err: err}
 }
 
-func (s *DetailScreen) openInNvim(newPane bool) tea.Cmd {
+func (s *DetailScreen) openInNvim() tea.Cmd {
 	if !s.downloaded {
 		s.statusMsg = "Download the exercise first (d)"
 		return nil
@@ -138,19 +140,15 @@ func (s *DetailScreen) openInNvim(newPane bool) tea.Cmd {
 		s.statusMsg = fmt.Sprintf("Error: %v", err)
 		return nil
 	}
-	if newPane {
-		s.statusMsg = fmt.Sprintf("Opening new pane → %s", filePath)
-		return tmuxOpenNewPane(filePath)
-	}
-	s.statusMsg = fmt.Sprintf("Sent to nvim → %s", filePath)
-	return tmuxSendToNvim(filePath)
+	s.statusMsg = fmt.Sprintf("Opening new pane → %s", filePath)
+	return tmuxOpenNewPane(filePath)
 }
 
 func (s *DetailScreen) SetSize(width, height int) {
 	oldWidth := s.width
 	s.width = width
 	s.height = height
-	s.viewport.SetWidth(width - 1) // reserve 1 col for scrollbar
+	s.viewport.SetWidth(width)
 	s.viewport.SetHeight(height - 3) // title header + status line + help bar
 	// Re-render markdown if width changed and we have content
 	if oldWidth != width && s.instructions != "" {
@@ -159,16 +157,15 @@ func (s *DetailScreen) SetSize(width, height int) {
 }
 
 func (s *DetailScreen) renderMarkdown(md string) string {
-	// Account for glamour's document margin (2 per side = 4 total) + scrollbar (1)
-	glamourGutter := 5
+	// Account for glamour's document margin (2 per side = 4 total)
+	glamourGutter := 4
 	width := s.width - glamourGutter
 	if width < 40 {
 		width = 40
 	}
 
-	style := exercismGlamourStyle()
 	renderer, err := glamour.NewTermRenderer(
-		glamour.WithStyles(style),
+		glamourStyleOption(),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
@@ -179,34 +176,7 @@ func (s *DetailScreen) renderMarkdown(md string) string {
 	if err != nil {
 		return md
 	}
-	return postProcessMarkdown(rendered)
-}
-
-// postProcessMarkdown adds breathing room to glamour output:
-// - blank line between adjacent list items
-// - blank line before numbered list items
-func postProcessMarkdown(rendered string) string {
-	lines := strings.Split(rendered, "\n")
-	var out []string
-
-	for i, line := range lines {
-		stripped := xansi.Strip(line)
-		trimmed := strings.TrimLeft(stripped, " ")
-
-		isBullet := strings.HasPrefix(trimmed, "• ")
-		isNumbered := len(trimmed) > 2 && trimmed[0] >= '1' && trimmed[0] <= '9' && strings.Contains(trimmed[:4], ". ")
-
-		if i > 0 && (isBullet || isNumbered) {
-			// Add blank line before this item if previous line isn't already blank
-			prevStripped := strings.TrimSpace(xansi.Strip(lines[i-1]))
-			if prevStripped != "" {
-				out = append(out, "")
-			}
-		}
-		out = append(out, line)
-	}
-
-	return strings.Join(out, "\n")
+	return rendered
 }
 
 // stripFirstH1 removes the first markdown H1 heading (and any blank lines after it)
@@ -383,12 +353,16 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			s.statusMsg = "Press C again to mark complete, any other key to cancel"
 			return s, nil
 		case "e":
-			return s, s.openInNvim(false)
-		case "E":
-			return s, s.openInNvim(true)
+			return s, s.openInNvim()
 		case "c":
 			screen := NewCommunityScreen(s.client, s.trackSlug, s.exercise.Slug)
 			return s, pushScreen(screen)
+		case "g":
+			s.viewport.GotoTop()
+			return s, nil
+		case "G":
+			s.viewport.GotoBottom()
+			return s, nil
 		case "o":
 			url := fmt.Sprintf("https://exercism.org/tracks/%s/exercises/%s", s.trackSlug, s.exercise.Slug)
 			s.statusMsg = fmt.Sprintf("Open in browser: %s", url)
@@ -413,9 +387,7 @@ func (s *DetailScreen) View() string {
 	title := lipgloss.NewStyle().Bold(true).Foreground(accent).Render(s.exercise.Title)
 	header := "  " + title
 
-	// Viewport with scrollbar
 	vpContent := s.viewport.View()
-	vpContent = renderScrollbar(vpContent, s.viewport.Height(), s.viewport.TotalLineCount(), s.viewport.YOffset())
 
 	status := s.buildStatusLine()
 	return header + "\n" + vpContent + "\n" + status
@@ -439,6 +411,25 @@ func (s *DetailScreen) buildStatusLine() string {
 		parts = append(parts, lipgloss.NewStyle().Foreground(accent).Render(s.statusMsg))
 	}
 
+	// Scroll position indicator (like Glow)
+	total := s.viewport.TotalLineCount()
+	vpHeight := s.viewport.Height()
+	if total > vpHeight {
+		offset := s.viewport.YOffset()
+		maxOffset := total - vpHeight
+		var pos string
+		switch {
+		case offset == 0:
+			pos = "Top"
+		case offset >= maxOffset:
+			pos = "Bot"
+		default:
+			pct := offset * 100 / maxOffset
+			pos = fmt.Sprintf("%d%%", pct)
+		}
+		parts = append(parts, subtle.Render(pos))
+	}
+
 	line := "  "
 	for i, p := range parts {
 		if i > 0 {
@@ -452,13 +443,13 @@ func (s *DetailScreen) buildStatusLine() string {
 func (s *DetailScreen) ShortHelp() []key.Binding {
 	bindings := []key.Binding{
 		key.NewBinding(key.WithKeys("j/k"), key.WithHelp("j/k", "scroll")),
+		key.NewBinding(key.WithKeys("g/G"), key.WithHelp("g/G", "top/bot")),
 	}
 	if !s.downloaded {
 		bindings = append(bindings, key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "download")))
 	} else {
 		bindings = append(bindings,
 			key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "nvim")),
-			key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "nvim (new pane)")),
 			key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "test")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "submit")),
 			key.NewBinding(key.WithKeys("C"), key.WithHelp("C", "complete")),

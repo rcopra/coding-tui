@@ -11,7 +11,7 @@ import (
 	"charm.land/glamour/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/rcopra/coding-tui/internal/api"
+	"github.com/rcopra/gym/internal/api"
 )
 
 // Messages
@@ -259,9 +259,8 @@ func (s *SolutionViewerScreen) renderFiles(files []api.CommunitySolutionFile) st
 		if width < 40 {
 			width = 40
 		}
-		style := exercismGlamourStyle()
 		renderer, err := glamour.NewTermRenderer(
-			glamour.WithStyles(style),
+			glamourStyleOption(),
 			glamour.WithWordWrap(width),
 		)
 		if err != nil {

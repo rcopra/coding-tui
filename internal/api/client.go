@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rcopra/coding-tui/internal/cache"
+	"github.com/rcopra/gym/internal/cache"
 )
 
 // ErrTrackNotJoined is returned when the API returns a track_not_joined error.

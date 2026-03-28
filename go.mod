@@ -1,4 +1,4 @@
-module github.com/rcopra/coding-tui
+module github.com/rcopra/gym
 
 go 1.26.1
 

@@ -1,11 +1,9 @@
 package ui
 
 import (
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -45,27 +43,6 @@ func popScreen() tea.Msg {
 }
 
 type tmuxSentMsg struct{ err error }
-
-// tmuxSendToNvim sends `:e <filepath><CR>` to the next tmux pane,
-// telling an already-running nvim to open the file.
-// Checks that another pane exists first to avoid sending keys to ourselves.
-func tmuxSendToNvim(filePath string) tea.Cmd {
-	return func() tea.Msg {
-		// Check there's more than one pane — {next} wraps to self with only one
-		out, err := exec.Command("tmux", "list-panes", "-F", "#{pane_id}").Output()
-		if err != nil {
-			return tmuxSentMsg{err: fmt.Errorf("not in tmux")}
-		}
-		panes := strings.Split(strings.TrimSpace(string(out)), "\n")
-		if len(panes) < 2 {
-			return tmuxSentMsg{err: fmt.Errorf("no other pane open — press E to open nvim in a new split")}
-		}
-
-		cmd := exec.Command("tmux", "send-keys", "-t", "{next}", "Escape", ":e "+filePath, "Enter")
-		err = cmd.Run()
-		return tmuxSentMsg{err: err}
-	}
-}
 
 // tmuxOpenNewPane opens a new tmux split to the left with nvim pointing at the file.
 func tmuxOpenNewPane(filePath string) tea.Cmd {

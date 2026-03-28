@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/rcopra/coding-tui/internal/workspace"
+	"github.com/rcopra/gym/internal/workspace"
 )
 
 // Messages

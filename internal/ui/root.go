@@ -88,9 +88,6 @@ func (r Root) View() tea.View {
 
 	content := header + "\n\n" + body + "\n" + helpBar
 
-	// Pad every line to full width with true black background
-	content = fillBackground(content, r.width)
-
 	v := tea.NewView(content)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
