@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -156,6 +157,16 @@ func (s *DetailScreen) SetSize(width, height int) {
 	}
 }
 
+func (s *DetailScreen) openBat() tea.Cmd {
+	content := stripFirstH1(s.instructions)
+	if s.showHints && s.hints != "" {
+		content += "\n---\n\n## Hints\n\n" + s.hints
+	}
+	c := exec.Command("bat", "--language=md", "--style=plain", "--paging=always")
+	c.Stdin = strings.NewReader(content)
+	return tea.ExecProcess(c, func(err error) tea.Msg { return nil })
+}
+
 func (s *DetailScreen) renderMarkdown(md string) string {
 	// Account for glamour's document margin (2 per side = 4 total)
 	glamourGutter := 4
@@ -206,6 +217,7 @@ func (s *DetailScreen) updateContent() {
 	if s.showHints && s.hints != "" {
 		content += "\n---\n\n## Hints\n\n" + s.hints
 	}
+	content = preprocessMarkdown(content)
 	s.viewport.SetContent(s.renderMarkdown(content))
 }
 
@@ -357,6 +369,8 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		case "c":
 			screen := NewCommunityScreen(s.client, s.trackSlug, s.exercise.Slug)
 			return s, pushScreen(screen)
+		case "p":
+			return s, s.openBat()
 		case "g":
 			s.viewport.GotoTop()
 			return s, nil
@@ -456,6 +470,7 @@ func (s *DetailScreen) ShortHelp() []key.Binding {
 		)
 	}
 	bindings = append(bindings,
+		key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "bat")),
 		key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "hints")),
 		key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "community")),
 		key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "browser")),
