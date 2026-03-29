@@ -125,18 +125,12 @@ func parseJestJSON(output []byte) *TestResult {
 	}
 
 	var jest struct {
-		NumPassedTests  int `json:"numPassedTests"`
-		NumFailedTests  int `json:"numFailedTests"`
-		NumTotalTests   int `json:"numTotalTests"`
-		Success         bool `json:"success"`
-		TestResults     []struct {
+		NumPassedTests int  `json:"numPassedTests"`
+		NumFailedTests int  `json:"numFailedTests"`
+		NumTotalTests  int  `json:"numTotalTests"`
+		Success        bool `json:"success"`
+		TestResults    []struct {
 			AssertionResults []struct {
-				FullName        string   `json:"fullName"`
-				Status          string   `json:"status"`
-				FailureMessages []string `json:"failureMessages"`
-			} `json:"assertionResults"`
-			// Jest uses both spellings depending on version
-			AssertionResults2 []struct {
 				FullName        string   `json:"fullName"`
 				Status          string   `json:"status"`
 				FailureMessages []string `json:"failureMessages"`
@@ -159,11 +153,7 @@ func parseJestJSON(output []byte) *TestResult {
 	}
 
 	for _, suite := range jest.TestResults {
-		assertions := suite.AssertionResults
-		if len(assertions) == 0 {
-			assertions = suite.AssertionResults2
-		}
-		for _, a := range assertions {
+		for _, a := range suite.AssertionResults {
 			tc := TestCase{
 				Name:   a.FullName,
 				Status: a.Status,

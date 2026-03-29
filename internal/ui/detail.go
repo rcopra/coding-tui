@@ -251,6 +251,8 @@ func (s *DetailScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	case tmuxSentMsg:
 		if msg.err != nil {
 			s.statusMsg = fmt.Sprintf("tmux error: %v (are you in tmux?)", msg.err)
+		} else {
+			s.statusMsg = ""
 		}
 		return s, nil
 
